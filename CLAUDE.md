@@ -4,69 +4,103 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-End-to-end MLOps system for telecom customer churn prediction. The goal is not just a trained model, but a complete production lifecycle: experiment tracking, model registry with champion/challenger promotion, drift detection, and automatic retraining. Dataset: Telco Customer Churn (7 043 rows × 50 columns, in `data/raw/telco.csv`).
+End-to-end MLOps system for telecom customer churn prediction. The goal is not just a trained model, but a complete production lifecycle: experiment tracking, model registry with champion/challenger promotion, drift detection, and automatic retraining. Dataset: Telco Customer Churn (7 043 rows × 50 columns), tracked by DVC with remote on DagsHub.
 
 ## Development commands
 
-All dependency management uses **uv** (not pip or poetry).
+All dependency management uses **uv** (not pip or poetry). Python version: 3.11 (managed by uv).
 
 ```bash
-uv sync                   # install all dependencies
-uv run pytest             # run all tests
-uv run pytest tests/unit  # run a single test folder
-uv run ruff check .       # lint
-uv run ruff format .      # format
-uv run mypy src/          # type-check
+uv sync                    # install all dependencies (creates .venv with Python 3.11)
+uv run pytest              # run all tests
+uv run pytest tests/unit   # run a single test folder
+uv run ruff check .        # lint
+uv run ruff format .       # format
+uv run mypy src/           # type-check (runs in CI, not in pre-commit — too slow)
+uv run pre-commit install  # install git hooks (one-time, after cloning)
 ```
 
-DVC pipeline:
+DVC:
 ```bash
-dvc repro                 # run the full pipeline (data → features → training)
-dvc repro train           # run a single stage by name
+dvc pull                   # download data after cloning (requires DagsHub credentials)
+dvc repro                  # run the full pipeline (data → features → training)
+dvc repro <stage>          # run a single named stage
+dvc push                   # upload new data versions to DagsHub
 ```
 
 Docker:
 ```bash
-docker compose up         # start all services (MLflow, API, dashboard, monitoring)
-docker compose up mlflow  # start a single service
+docker compose up          # start all services (MLflow, API, dashboard, monitoring)
+docker compose up mlflow   # start a single service
 ```
 
 ## Architecture
 
-Unidirectional layer dependency: **Data → Features → Training → Registry/Serving → Monitoring → Presentation**. Each layer only imports from layers above it — monitoring depends on serving and training, but neither depends on monitoring.
+Unidirectional layer dependency — each layer only imports from layers above it:
+
+```
+Data → Features → Training → Registry/Serving → Monitoring → Presentation
+```
 
 ```
 src/churn_mlops/
-├── data/          # ingestion + Pandera schema validation + drift injection
-├── features/      # feature engineering (no model logic here)
-├── training/      # model training, hyperparameter search, evaluation
+├── data/          # ingestion + Pandera schema validation + drift injection (batches)
+├── features/      # feature engineering only — no model logic
+├── training/      # training, evaluation, hyperparameter search (Optuna), MLflow logging
 ├── registry/      # champion/challenger promotion logic (MLflow Model Registry)
 ├── monitoring/    # Evidently AI drift detection + retraining trigger
-├── serving/api/   # FastAPI app + Pydantic request/response schemas + SHAP
+├── serving/api/   # FastAPI app + Pydantic schemas + SHAP explanations
 └── dashboard/     # Streamlit app
 ```
 
-**Two validation boundaries** — Pandera validates raw batch data (CSV/DataFrames), Pydantic validates individual API requests. Do not swap these.
+**Two validation boundaries** — Pandera validates raw batch DataFrames; Pydantic validates individual API request objects. Do not swap these.
 
-**Champion/challenger flow**: the registry layer compares the newly trained challenger against the current production champion on a held-out set; promotion happens only if the challenger wins by a predefined margin. A/B testing with live traffic is out of scope by design.
+**Champion/challenger**: the registry layer compares the newly trained challenger against the current production model on a held-out set. Promotion only if the challenger wins by a predefined margin, verified across segments — not just aggregate F1.
 
 ## Key conventions
 
-- **Src layout**: all application code lives under `src/churn_mlops/`. Imports always use the full package path (`from churn_mlops.data import ...`).
-- **Tests**: organized as `tests/unit/`, `tests/integration/`, `tests/data_validation/`. Integration tests may require MLflow running locally.
-- **Data versioning**: `data/` is managed by DVC, not committed to git. Running `dvc pull` is required after cloning.
-- **Notebooks**: `notebooks/` is for exploration only — no production logic should live there.
-- **Configs**: environment-specific configs go in `configs/`. No hardcoded paths or thresholds in source code.
-- **Experiment tracking**: all training runs must log params, metrics, and artifacts to MLflow. The MLflow tracking URI is set via environment variable (`MLFLOW_TRACKING_URI`).
+- **Src layout**: all application code under `src/churn_mlops/`. Always install via `uv sync` before running; imports like `from churn_mlops.data import ...`.
+- **Tests**: mirror `src/` structure under `tests/unit/`, `tests/integration/`, `tests/data_validation/`.
+- **Data**: `data/` is DVC-managed. The `.dvc` pointer files go to git; actual data goes to DagsHub. Run `dvc pull` after cloning.
+- **Notebooks**: `notebooks/` is exploration only. No production logic lives there.
+- **Config**: environment-specific settings go in `configs/*.yaml`. No hardcoded paths or thresholds in source code.
+- **MLflow**: all training runs log params, metrics, and artifacts to the DagsHub-hosted MLflow server. URI is set via `MLFLOW_TRACKING_URI` env var (see `.env.example`).
+- **Commits**: Conventional Commits style (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
+- **Branches**: one `feat/<scope>` branch per phase/feature, one PR per branch, merged to `main`.
+- **Design decisions**: significant architecture/tooling decisions are logged as ADRs in `docs/decisions/`. Check there before proposing an alternative to something already decided.
 
-## Infrastructure
+## Infrastructure and credentials
 
-| Service      | Purpose                                  |
-|--------------|------------------------------------------|
-| MLflow       | Experiment tracking + Model Registry     |
-| FastAPI      | REST prediction API + SHAP explanations  |
-| Streamlit    | Dashboard (deployed to Hugging Face Spaces) |
-| Evidently AI | Drift detection reports                  |
-| GitHub Actions | CI (lint, type-check, tests) + CD      |
+| Service | URL | Purpose |
+|---|---|---|
+| DVC remote | `https://dagshub.com/ayorick23/telco-churn-mlops.dvc` | Data versioning |
+| MLflow | `https://dagshub.com/ayorick23/telco-churn-mlops.mlflow` | Experiment tracking + Model Registry |
+| FastAPI | Render / Railway (free tier) | REST prediction API |
+| Streamlit | Hugging Face Spaces | Dashboard |
+| GitHub Actions | — | CI (lint, type-check, tests) + CD |
 
-CI runs Ruff, MyPy, and pytest on every PR. Pre-commit hooks enforce the same checks locally.
+Credentials go in `.env` (gitignored). Use `.env.example` as the template. DVC credentials also go in `.dvc/config.local` (gitignored).
+
+## Known dependency quirk
+
+`shap` has a transitive dependency on `llvmlite` via `numba`. Without explicit version bounds, uv resolves `llvmlite==0.36.0` which only supports Python <3.10. Fixed by pinning in `pyproject.toml`:
+
+```toml
+"llvmlite>=0.41",
+"numba>=0.57",
+```
+
+Do not remove these lines.
+
+## Project status (as of 2026-08-08)
+
+| Phase | Status |
+|---|---|
+| 1. Setup y EDA | ✅ Completado |
+| 2. Data layer + features | ⬜ Pendiente |
+| 3. Selección de modelo | ⬜ Pendiente |
+| 4. Training pipeline definitivo | ⬜ Pendiente |
+| 5. Simulación de drift + monitoreo | ⬜ Pendiente |
+| 6. Reentrenamiento y promoción | ⬜ Pendiente |
+| 7. Serving + dashboard | ⬜ Pendiente |
+| 8. Testing, CI/CD, despliegue | ⬜ Pendiente |

@@ -46,7 +46,7 @@ Decisiones deliberadas de alcance, no limitaciones por descuido:
 
 El sistema está organizado en capas con dependencias en una sola dirección:
 
-```
+```plain text
 Data → Features → Training → Model Registry / Serving → Monitoring
                                         ↓
                                   Presentation (API + Dashboard)
@@ -98,16 +98,16 @@ churn-mlops/
 
 ## Estado del proyecto
 
-| Fase                                         | Estado       |
-| -------------------------------------------- | ------------ |
-| 1. Setup y EDA                               | ⬜ Pendiente |
-| 2. Data layer + features                     | ⬜ Pendiente |
-| 3. Selección de modelo                       | ⬜ Pendiente |
-| 4. Training pipeline definitivo              | ⬜ Pendiente |
-| 5. Simulación de drift + monitoreo           | ⬜ Pendiente |
-| 6. Reentrenamiento y promoción               | ⬜ Pendiente |
-| 7. Serving + dashboard                       | ⬜ Pendiente |
-| 8. Testing, CI/CD, despliegue, documentación | ⬜ Pendiente |
+| Fase                                         | Estado        |
+| -------------------------------------------- | ------------- |
+| 1. Setup y EDA                               | ✅ Completado |
+| 2. Data layer + features                     | ⬜ Pendiente  |
+| 3. Selección de modelo                       | ⬜ Pendiente  |
+| 4. Training pipeline definitivo              | ⬜ Pendiente  |
+| 5. Simulación de drift + monitoreo           | ⬜ Pendiente  |
+| 6. Reentrenamiento y promoción               | ⬜ Pendiente  |
+| 7. Serving + dashboard                       | ⬜ Pendiente  |
+| 8. Testing, CI/CD, despliegue, documentación | ⬜ Pendiente  |
 
 ## Cómo ejecutarlo
 
@@ -127,7 +127,7 @@ docker compose up
 
 ## Roadmap
 
-Roadmap detallado (8 semanas, con entregables y criterios de aceptación por fase) disponible en `docs/plan-proyecto.md`.
+El roadmap del proyecto son las 8 fases de la tabla de "Estado del proyecto". Las decisiones de diseño y tooling tomadas en cada fase quedan registradas como ADRs en [`docs/decisions/`](docs/decisions/). El EDA completo de la Fase 1 está en [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 
 ---
 
