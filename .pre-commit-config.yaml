@@ -1,0 +1,30 @@
+﻿repos:
+  # Ruff: linter + formatter en una sola herramienta.
+  # "ruff" con --fix corrige automaticamente lo que puede (imports no usados, etc.)
+  # "ruff-format" formatea el codigo (equivalente a Black).
+  # El orden importa: primero lint+fix, luego format.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  # Hooks basicos de pre-commit que no requieren instalar nada extra.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # Elimina espacios en blanco al final de cada linea.
+      - id: trailing-whitespace
+      # Asegura que todos los archivos terminen con un newline.
+      - id: end-of-file-fixer
+      # Valida sintaxis de archivos YAML (dvc.yaml, docker-compose.yml, etc.)
+      - id: check-yaml
+      # Previene commits accidentales de archivos pesados (modelos, datasets).
+      # uv.lock se excluye porque es un archivo de texto que debe vivir en git
+      # (garantiza instalaciones reproducibles) — no es un binario ni un dataset.
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+        exclude: "^uv\\.lock$"
+      # Detecta marcadores de conflicto de merge no resueltos.
+      - id: check-merge-conflict

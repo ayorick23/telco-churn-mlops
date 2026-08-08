@@ -1,0 +1,79 @@
+# ── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Distribución / empaquetado
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Entornos virtuales ────────────────────────────────────────────────
+.venv/
+venv/
+.uv/
+
+# ── Testing y cobertura ───────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ── Type checking ────────────────────────────────────────────────────
+.mypy_cache/
+
+# ── Linting ──────────────────────────────────────────────────────────
+.ruff_cache/
+
+# ── Jupyter ──────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── MLflow (local) ────────────────────────────────────────────────────
+# Los artefactos y runs se loggean a DagsHub, no al repo local.
+# Si alguien corre MLflow localmente sin configurar el tracking URI,
+# estos directorios se crean en la raíz del proyecto.
+mlruns/
+mlartifacts/
+
+# ── DVC ──────────────────────────────────────────────────────────────
+# config.local tiene las credenciales de DagsHub (usuario + token).
+# NUNCA debe commitearse.
+.dvc/config.local
+# El cache de DVC vive localmente, no en git.
+.dvc/cache/
+# tmp de DVC
+.dvc/tmp/
+
+# ── Datos (gestionados por DVC, no por git) ───────────────────────────
+# data/ es gestionado por DVC: los archivos reales se suben a DagsHub,
+# los .dvc files (hashes) sí van a git.
+# Nota: dvc add agrega automáticamente cada archivo a su .gitignore local.
+# Esta línea es una salvaguarda general.
+#data/raw/
+data/processed/
+data/features/
+data/batches/
+
+# ── Variables de entorno / secretos ──────────────────────────────────
+.env
+.env.local
+.env.*.local
+# .env.example SÍ va a git (es un template sin valores reales)
+
+# ── Streamlit ────────────────────────────────────────────────────────
+.streamlit/secrets.toml
+
+# ── OS ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDEs ──────────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/*.code-workspace
+.idea/
+*.swp
+*.swo

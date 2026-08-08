@@ -1,0 +1,137 @@
+# ============================================================
+# pyproject.toml — archivo único de configuración del proyecto
+# Reemplaza setup.py, setup.cfg, .flake8, mypy.ini, pytest.ini
+# ============================================================
+
+# --- SISTEMA DE BUILD ---
+# Le dice a pip/uv qué herramienta usar para empaquetar el proyecto.
+# hatchling es el build backend recomendado por uv para proyectos nuevos.
+# Es más simple que setuptools para src layout.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Le dice a hatchling dónde está el paquete (src layout).
+# Sin esto, buscaría el paquete en la raíz en vez de en src/.
+[tool.hatch.build.targets.wheel]
+packages = ["src/churn_mlops"]
+
+# --- METADATOS Y DEPENDENCIAS DEL PROYECTO ---
+[project]
+name = "churn-mlops"
+version = "0.1.0"
+description = "End-to-end MLOps system for telco customer churn prediction"
+requires-python = ">=3.11"
+
+dependencies = [
+    # ── Data ──────────────────────────────────────────────────────
+    "pandas>=2.2",      # DataFrames: ingesta, features, validación
+    "numpy>=1.26",      # operaciones numéricas base
+
+    # ── ML ────────────────────────────────────────────────────────
+    "scikit-learn>=1.5",   # Pipeline, ColumnTransformer, LogisticRegression
+    "xgboost>=2.0",
+    "lightgbm>=4.3",
+    "catboost>=1.2",
+    "optuna>=3.6",         # optimización de hiperparámetros (Fase 4)
+
+    # ── MLOps ─────────────────────────────────────────────────────
+    "mlflow>=2.14",         # tracking de experimentos + model registry
+    "dvc>=3.51",            # versionado de datos y pipeline reproducible
+    "dagshub>=0.3",         # SDK para autenticación con DagsHub (DVC + MLflow)
+
+    # ── Validación de datos ────────────────────────────────────────
+    # pandera[mypy] instala el plugin de MyPy para validar schemas en tiempo de análisis estático
+    "pandera[mypy]>=0.20",
+
+    # ── Monitoreo de drift ─────────────────────────────────────────
+    "evidently>=0.4",
+
+    # ── Serving ───────────────────────────────────────────────────
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.28",  # servidor ASGI para FastAPI
+    "shap>=0.45",               # explicabilidad por predicción individual
+    # llvmlite y numba son dependencias transitivas de shap.
+    # Sin estos límites inferiores, el resolver elige llvmlite==0.36.0 que
+    # solo soporta Python <3.10 y falla al compilarse en Python 3.11+.
+    # llvmlite 0.41+ y numba 0.57+ soportan Python 3.11.
+    "llvmlite>=0.41",
+    "numba>=0.57",
+
+    # ── Dashboard ─────────────────────────────────────────────────
+    "streamlit>=1.33",
+
+    # ── Visualización (EDA + dashboard) ───────────────────────────
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+]
+
+# Las dependency-groups son grupos de dependencias OPCIONALES.
+# El grupo "dev" contiene herramientas que solo se necesitan en desarrollo,
+# no en producción (en Docker se instala solo el grupo base).
+# Se instalan con: uv sync --group dev (o uv sync, que las incluye por defecto en desarrollo)
+[dependency-groups]
+dev = [
+    "ruff>=0.5",         # linter + formatter (reemplaza Flake8 + isort + Black)
+    "mypy>=1.9",         # type checker estático
+    "pandas-stubs>=2.2", # stubs de tipos para pandas (mejora el análisis de MyPy)
+    "pytest>=8.0",
+    "pytest-cov>=5.0",   # reporte de cobertura de tests
+    "pre-commit>=3.7",   # ejecuta hooks antes de cada commit
+    "ipykernel>=6.29",   # permite usar el entorno del proyecto en Jupyter notebooks
+]
+
+# ============================================================
+# CONFIGURACIÓN DE HERRAMIENTAS
+# ============================================================
+
+# --- RUFF (linter + formatter) ---
+[tool.ruff]
+line-length = 88     # estándar de Black, que Ruff adopta por defecto
+target-version = "py311"
+
+[tool.ruff.lint]
+# Conjuntos de reglas habilitadas:
+# E, W = pycodestyle (estilo PEP 8)
+# F    = pyflakes (imports no usados, variables no definidas)
+# I    = isort (orden de imports)
+# UP   = pyupgrade (sintaxis Python moderna, ej. usar f-strings en vez de .format())
+# B    = flake8-bugbear (bugs comunes y malos patrones de diseño)
+# N    = pep8-naming (convenciones de nombres: snake_case para funciones, etc.)
+select = ["E", "W", "F", "I", "UP", "B", "N"]
+
+# E501 = línea demasiado larga.
+# Lo ignoramos porque el formatter ya lo maneja automáticamente.
+# Que el linter Y el formatter controlen lo mismo genera conflictos.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# En notebooks: los imports fuera de orden (E402) y los imports no usados (F401)
+# son normales (una celda de import puede importar cosas que se usan más adelante).
+"notebooks/*" = ["E402", "F401"]
+
+# --- MYPY (type checker) ---
+[tool.mypy]
+python_version = "3.11"
+
+# Muchas librerías de ML (CatBoost, Evidently, DVC) no tienen stubs de tipos.
+# ignore_missing_imports = true evita errores de MyPy por eso.
+ignore_missing_imports = true
+
+# Todas las funciones deben tener anotaciones de tipos.
+# Esto es lo más valioso de MyPy: detecta errores de tipo en las fronteras entre capas.
+disallow_untyped_defs = true
+
+warn_return_any = true    # avisa si una función devuelve Any (pérdida de información de tipo)
+warn_unused_configs = true
+
+# Plugin de Pandera: valida que los schemas de Pandera sean usados correctamente
+plugins = ["pandera.mypy"]
+
+# --- PYTEST ---
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -v = verbose (muestra el nombre de cada test)
+# --cov=src/churn_mlops = mide cobertura del paquete (no de los tests ni notebooks)
+# --cov-report=term-missing = en la terminal muestra qué líneas no están cubiertas
+addopts = "-v --cov=src/churn_mlops --cov-report=term-missing"
