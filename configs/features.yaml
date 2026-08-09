@@ -1,0 +1,43 @@
+# Columnas y umbrales usados por src/churn_mlops/features/build_features.py.
+# El porqué de cada exclusión está documentado en:
+# - docs/decisions/0006-exclusion-de-columnas-por-data-leakage.md (leakage_columns)
+# - notebooks/01_eda.ipynb, sección 8 (low_signal_columns)
+
+# Derivadas del target o disponibles solo post-churn — nunca deben ser input del modelo.
+leakage_columns:
+  - Churn Score
+  - Customer Status
+  - Churn Category
+  - Churn Reason
+
+# Baja señal / alto costo de encoding, o posiblemente derivadas del target (CLTV).
+low_signal_columns:
+  - Latitude
+  - Longitude
+  - Zip Code
+  - CLTV
+
+# Un único valor en todo el dataset (nunique=1 en el EDA) — cero información.
+constant_columns:
+  - Country
+  - State
+  - Quarter
+
+# Identificador de fila, no una feature.
+id_columns:
+  - Customer ID
+
+# Usadas para derivar num_extra_services (conteo de "Yes").
+service_columns:
+  - Online Security
+  - Online Backup
+  - Device Protection Plan
+  - Premium Tech Support
+  - Streaming TV
+  - Streaming Movies
+  - Streaming Music
+  - Unlimited Data
+  - Multiple Lines
+
+# is_new_customer = 1 si Tenure in Months < este umbral.
+new_customer_tenure_threshold: 12

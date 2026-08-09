@@ -101,7 +101,7 @@ churn-mlops/
 | Fase                                         | Estado        |
 | -------------------------------------------- | ------------- |
 | 1. Setup y EDA                               | ✅ Completado |
-| 2. Data layer + features                     | ⬜ Pendiente  |
+| 2. Data layer + features                     | ✅ Completado |
 | 3. Selección de modelo                       | ⬜ Pendiente  |
 | 4. Training pipeline definitivo              | ⬜ Pendiente  |
 | 5. Simulación de drift + monitoreo           | ⬜ Pendiente  |
@@ -120,6 +120,13 @@ cd churn-mlops
 
 # instalar dependencias con uv
 uv sync
+
+# descargar los datos versionados con DVC (requiere credenciales de DagsHub)
+dvc pull
+
+# correr el pipeline: valida el CSV crudo contra el schema de Pandera y genera
+# data/processed/train.parquet y test.parquet
+dvc repro
 
 # levantar el entorno completo (entrenamiento, MLflow, monitoreo)
 docker compose up

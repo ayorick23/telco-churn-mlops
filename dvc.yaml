@@ -1,0 +1,14 @@
+stages:
+  build_features:
+    cmd: uv run python -m churn_mlops.features.build_features
+    deps:
+      - data/raw/telco.csv
+      - src/churn_mlops/data/schema.py
+      - src/churn_mlops/data/load.py
+      - src/churn_mlops/features/build_features.py
+    params:
+      - configs/data.yaml:
+      - configs/features.yaml:
+    outs:
+      - data/processed/train.parquet
+      - data/processed/test.parquet
