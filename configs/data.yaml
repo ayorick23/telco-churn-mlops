@@ -1,0 +1,11 @@
+# Configuración de ingesta y split de datos (Fase 2).
+# Ver docs/decisions/ para el porqué de las decisiones que dependen de estos valores.
+
+raw_path: data/raw/telco.csv
+processed_dir: data/processed
+target_column: Churn Label
+
+# Split train/test fijo y versionado en esta fase (ver plan de Fase 2):
+# todos los experimentos de Fase 3 comparan modelos sobre el mismo held-out set.
+test_size: 0.2
+random_state: 42

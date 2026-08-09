@@ -27,6 +27,8 @@ dependencies = [
     # ── Data ──────────────────────────────────────────────────────
     "pandas>=2.2",      # DataFrames: ingesta, features, validación
     "numpy>=1.26",      # operaciones numéricas base
+    "pyyaml>=6.0",       # lectura de configs/*.yaml (antes solo transitiva vía mlflow/dvc)
+    "pyarrow>=16.0",     # engine de pandas para leer/escribir data/processed/*.parquet
 
     # ── ML ────────────────────────────────────────────────────────
     "scikit-learn>=1.5",   # Pipeline, ColumnTransformer, LogisticRegression
@@ -103,7 +105,10 @@ select = ["E", "W", "F", "I", "UP", "B", "N"]
 # E501 = línea demasiado larga.
 # Lo ignoramos porque el formatter ya lo maneja automáticamente.
 # Que el linter Y el formatter controlen lo mismo genera conflictos.
-ignore = ["E501"]
+# N803/N806 = nombres de argumento/variable no-lowercase.
+# Los ignoramos porque X/y son la convención estándar de scikit-learn para
+# matriz de features / vector target, usada en toda la capa de features y training.
+ignore = ["E501", "N803", "N806"]
 
 [tool.ruff.lint.per-file-ignores]
 # En notebooks: los imports fuera de orden (E402) y los imports no usados (F401)
