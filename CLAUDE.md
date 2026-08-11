@@ -98,7 +98,7 @@ Do not remove these lines.
 |---|---|
 | 1. Setup y EDA | ✅ Completado |
 | 2. Data layer + features | ✅ Completado |
-| 3. Selección de modelo | ⬜ Pendiente |
+| 3. Selección de modelo | ✅ Completado |
 | 4. Training pipeline definitivo | ⬜ Pendiente |
 | 5. Simulación de drift + monitoreo | ⬜ Pendiente |
 | 6. Reentrenamiento y promoción | ⬜ Pendiente |
