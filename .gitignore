@@ -38,6 +38,10 @@ coverage.xml
 mlruns/
 mlartifacts/
 
+# ── CatBoost ──────────────────────────────────────────────────────────
+# Logs de entrenamiento que CatBoost escribe en el cwd por defecto.
+catboost_info/
+
 # ── DVC ──────────────────────────────────────────────────────────────
 # config.local tiene las credenciales de DagsHub (usuario + token).
 # NUNCA debe commitearse.

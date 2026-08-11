@@ -41,6 +41,7 @@ dependencies = [
     "mlflow>=2.14",         # tracking de experimentos + model registry
     "dvc>=3.51",            # versionado de datos y pipeline reproducible
     "dagshub>=0.3",         # SDK para autenticación con DagsHub (DVC + MLflow)
+    "python-dotenv>=1.0",   # carga .env con MLFLOW_TRACKING_URI/credenciales (antes solo transitiva vía dagshub/mlflow)
 
     # ── Validación de datos ────────────────────────────────────────
     # pandera[mypy] instala el plugin de MyPy para validar schemas en tiempo de análisis estático
