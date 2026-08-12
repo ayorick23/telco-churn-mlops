@@ -36,6 +36,7 @@ dependencies = [
     "lightgbm>=4.3",
     "catboost>=1.2",
     "optuna>=3.6",         # optimización de hiperparámetros (Fase 4)
+    "joblib>=1.4",          # serializa el Pipeline final a models/ (antes solo transitiva vía scikit-learn)
 
     # ── MLOps ─────────────────────────────────────────────────────
     "mlflow>=2.14",         # tracking de experimentos + model registry

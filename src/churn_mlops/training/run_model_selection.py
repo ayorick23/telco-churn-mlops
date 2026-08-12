@@ -1,6 +1,6 @@
 """Orquesta Fase 3: entrena las 4 familias sobre train.parquet/test.parquet, loguea
-cada una como run de MLflow separado, y declara la ganadora por configs/training.yaml
-:selection_metric. Se corre a mano:
+cada una como run de MLflow separado, y declara la ganadora por
+configs/model_selection.yaml:selection_metric. Se corre a mano:
 
     uv run python -m churn_mlops.training.run_model_selection
 
@@ -161,7 +161,7 @@ def save_comparison_report(
 
 def main() -> None:
     data_config = load_yaml_config("configs/data.yaml")
-    training_config = load_yaml_config("configs/training.yaml")
+    training_config = load_yaml_config("configs/model_selection.yaml")
     configure_mlflow(training_config)
 
     X_train, X_test, y_train, y_test = load_processed_datasets(data_config)

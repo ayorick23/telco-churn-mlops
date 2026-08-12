@@ -9,16 +9,16 @@ stages:
       size: 1932822
     - path: src/churn_mlops/data/load.py
       hash: md5
-      md5: 4056c31f5a0f8561570287777bc77cc1
-      size: 440
+      md5: 7f2e9703b443345314c4369c368ea554
+      size: 455
     - path: src/churn_mlops/data/schema.py
       hash: md5
-      md5: d2fc467bbc192f264e8c79f58fb93085
-      size: 3491
+      md5: 679e7671a97cd7e15871d9b0273e52ef
+      size: 3585
     - path: src/churn_mlops/features/build_features.py
       hash: md5
-      md5: d7057b3d45b1de1bd547a3a633b3dbcd
-      size: 3882
+      md5: e2cccb3cd167ee594018dba7845c330f
+      size: 4000
     params:
       configs/data.yaml:
         processed_dir: data/processed
@@ -63,3 +63,106 @@ stages:
       hash: md5
       md5: dc585db10d18eb901df9befa7c1349a0
       size: 256029
+  train_model:
+    cmd: uv run python -m churn_mlops.training.run_training
+    deps:
+    - path: data/processed/test.parquet
+      hash: md5
+      md5: 85570671bfb56e598c459963ac2f9d77
+      size: 92503
+    - path: data/processed/train.parquet
+      hash: md5
+      md5: dc585db10d18eb901df9befa7c1349a0
+      size: 256029
+    - path: src/churn_mlops/training/dataset.py
+      hash: md5
+      md5: 8ab2c75e21d7d33714ccb4e89e900006
+      size: 868
+    - path: src/churn_mlops/training/evaluation.py
+      hash: md5
+      md5: e3f3d070b61c95eff8b200c7737e9a65
+      size: 1083
+    - path: src/churn_mlops/training/model_specs.py
+      hash: md5
+      md5: f28c124bec570462fb866290a23d30c0
+      size: 3316
+    - path: src/churn_mlops/training/preprocessing.py
+      hash: md5
+      md5: 59d8c477f4561e778e37713ef4d9a016
+      size: 2327
+    - path: src/churn_mlops/training/run_training.py
+      hash: md5
+      md5: f6b7c8579d4adfc2f39a085b1c1d9fdc
+      size: 5252
+    - path: src/churn_mlops/training/tuning.py
+      hash: md5
+      md5: d8ca72d417a41f5a3f0b7910c8461960
+      size: 4330
+    params:
+      configs/data.yaml:
+        processed_dir: data/processed
+        random_state: 42
+        raw_path: data/raw/telco.csv
+        target_column: Churn Label
+        test_size: 0.2
+      configs/training.yaml:
+        fixed_params:
+          class_weight: balanced
+          random_state: 42
+          verbose: -1
+        high_cardinality_columns:
+        - City
+        mlflow:
+          experiment_name: phase4-training
+        model_output_path: models/lightgbm_pipeline.pkl
+        optuna:
+          n_trials: 50
+          cv_folds: 5
+          direction: maximize
+          search_space:
+            n_estimators:
+              type: int
+              low: 100
+              high: 800
+              step: 50
+            max_depth:
+              type: int
+              low: 3
+              high: 12
+            learning_rate:
+              type: float
+              low: 0.01
+              high: 0.3
+              log: true
+            num_leaves:
+              type: int
+              low: 15
+              high: 255
+            min_child_samples:
+              type: int
+              low: 5
+              high: 100
+            subsample:
+              type: float
+              low: 0.5
+              high: 1.0
+            colsample_bytree:
+              type: float
+              low: 0.5
+              high: 1.0
+            reg_alpha:
+              type: float
+              low: 1e-08
+              high: 10.0
+              log: true
+            reg_lambda:
+              type: float
+              low: 1e-08
+              high: 10.0
+              log: true
+        registered_model_name: churn-lightgbm
+    outs:
+    - path: models/lightgbm_pipeline.pkl
+      hash: md5
+      md5: 5fb28565a452a5acac193b5099390679
+      size: 4978271

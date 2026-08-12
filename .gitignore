@@ -61,6 +61,10 @@ data/processed/
 data/features/
 data/batches/
 
+# models/ es gestionado por DVC vía el stage train_model (dvc.yaml): el .pkl
+# real se sube a DagsHub, dvc.lock trackea el hash. Análogo a data/processed/.
+models/
+
 # ── Variables de entorno / secretos ──────────────────────────────────
 .env
 .env.local
