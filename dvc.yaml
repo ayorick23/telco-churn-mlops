@@ -12,3 +12,20 @@ stages:
     outs:
       - data/processed/train.parquet
       - data/processed/test.parquet
+
+  train_model:
+    cmd: uv run python -m churn_mlops.training.run_training
+    deps:
+      - data/processed/train.parquet
+      - data/processed/test.parquet
+      - src/churn_mlops/training/dataset.py
+      - src/churn_mlops/training/preprocessing.py
+      - src/churn_mlops/training/model_specs.py
+      - src/churn_mlops/training/evaluation.py
+      - src/churn_mlops/training/tuning.py
+      - src/churn_mlops/training/run_training.py
+    params:
+      - configs/data.yaml:
+      - configs/training.yaml:
+    outs:
+      - models/lightgbm_pipeline.pkl

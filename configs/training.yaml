@@ -1,47 +1,76 @@
-# Configuración de Fase 3 — comparación de familias de modelo.
-# Ver docs/decisions/0009-comparacion-4-familias-y-encoding-por-framework.md.
+# Configuración de Fase 4 — tuning de LightGBM con Optuna, stage `train_model`
+# de dvc.yaml y registro en el MLflow Model Registry.
+# Ver docs/decisions/0010-pipeline-definitivo-fase-4.md.
 
 mlflow:
-  experiment_name: phase3-model-selection
+  experiment_name: phase4-training
 
-# Métrica de selección del ganador (clase positiva = churn=1).
-# accuracy/precision/recall/roc_auc/pr_auc se loguean como secundarias.
-selection_metric: f1
+# Nombre bajo el cual se registra cada corrida en el MLflow Model Registry
+# (ADR 0010): cada `dvc repro train_model` agrega una versión nueva, sin
+# promoción automática (eso es Fase 6).
+registered_model_name: churn-lightgbm
 
-# Alta cardinalidad (1104 valores únicos en train): se dropea en los pipelines
-# basados en one-hot (LR/XGBoost/LightGBM); CatBoost la recibe nativa.
+# Dónde se serializa el Pipeline fiteado (preprocesador + LGBMClassifier
+# tuneado), trackeado por DVC vía el stage train_model (no por git, ver
+# .gitignore).
+model_output_path: models/lightgbm_pipeline.pkl
+
+# Misma columna de alta cardinalidad excluida en Fase 3 (ADR 0009): LightGBM
+# usa one-hot, no soporta City nativa como CatBoost.
 high_cardinality_columns:
   - City
 
-# Carpeta donde se guarda la tabla comparativa + veredicto (git, no DVC).
-reports_dir: reports
+# Hiperparámetros fijos del LGBMClassifier, NO tuneados por Optuna.
+fixed_params:
+  class_weight: balanced # dataset desbalanceado (ADR 0009), igual que Fase 3
+  random_state: 42
+  verbose: -1 # silencia logs internos de LightGBM (no de Optuna)
 
-# Hiperparámetros por defecto/razonables (sin Optuna en esta fase, ver ADR 0009).
-models:
-  logistic_regression:
-    max_iter: 1000
-    class_weight: balanced
-    random_state: 42
-  xgboost:
-    n_estimators: 300
-    max_depth: 5
-    learning_rate: 0.1
-    eval_metric: logloss
-    random_state: 42
-    # scale_pos_weight NO va acá: se calcula en runtime desde y_train
-    # (churn_mlops.training.preprocessing.compute_scale_pos_weight) porque es
-    # un valor derivado de los datos, no un hiperparámetro fijo del modelo.
-  lightgbm:
-    n_estimators: 300
-    max_depth: -1
-    learning_rate: 0.1
-    class_weight: balanced
-    random_state: 42
-    verbose: -1
-  catboost:
-    iterations: 300
-    depth: 6
-    learning_rate: 0.1
-    auto_class_weights: Balanced
-    random_seed: 42
-    verbose: false
+optuna:
+  n_trials: 50 # 50 trials x 5 folds = 250 fits sobre ~5.6k filas de train
+  cv_folds: 5 # Stratified K-Fold sobre train.parquet (ADR 0010)
+  direction: maximize # F1 de la clase positiva, promedio entre folds
+  # Espacio de búsqueda: cada entrada es {type: int|float, ...kwargs de
+  # optuna.Trial.suggest_int/suggest_float}. `log: true` samplea en escala
+  # logarítmica (útil para learning_rate y los términos de regularización).
+  search_space:
+    n_estimators:
+      type: int
+      low: 100
+      high: 800
+      step: 50
+    max_depth:
+      type: int
+      low: 3
+      high: 12
+    learning_rate:
+      type: float
+      low: 0.01
+      high: 0.3
+      log: true
+    num_leaves:
+      type: int
+      low: 15
+      high: 255
+    min_child_samples:
+      type: int
+      low: 5
+      high: 100
+    subsample:
+      type: float
+      low: 0.5
+      high: 1.0
+    colsample_bytree:
+      type: float
+      low: 0.5
+      high: 1.0
+    reg_alpha:
+      type: float
+      low: 1.0e-8
+      high: 10.0
+      log: true
+    reg_lambda:
+      type: float
+      low: 1.0e-8
+      high: 10.0
+      log: true

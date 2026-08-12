@@ -16,7 +16,7 @@ def compute_classification_metrics(
     y_true: np.ndarray, y_pred: np.ndarray, y_proba: np.ndarray
 ) -> dict[str, float]:
     """F1/precision/recall de la clase positiva (churn=1, métrica de selección de
-    configs/training.yaml) + accuracy, ROC-AUC, PR-AUC como secundarias."""
+    configs/model_selection.yaml) + accuracy, ROC-AUC, PR-AUC como secundarias."""
     return {
         "f1": float(f1_score(y_true, y_pred, pos_label=1)),
         "accuracy": float(accuracy_score(y_true, y_pred)),
