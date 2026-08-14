@@ -70,6 +70,7 @@ src/churn_mlops/
 - **Commits**: Conventional Commits style (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
 - **Branches**: one `feat/<scope>` branch per phase/feature, one PR per branch, merged to `main`.
 - **Design decisions**: significant architecture/tooling decisions are logged as ADRs in `docs/decisions/`. Check there before proposing an alternative to something already decided.
+- **Learning goal**: this is an individual portfolio project — the point is to learn MLOps end-to-end, not just to ship a working pipeline. When a phase introduces a new library/tool (Optuna in Phase 4, Evidently AI in Phase 5), explain its core concepts, syntax, and the design decisions behind how it was used — don't just write the code and move on. At the end of each phase, do a detailed walkthrough of the new tools used in that phase, even if not explicitly asked.
 
 ## Infrastructure and credentials
 
@@ -94,7 +95,7 @@ Credentials go in `.env` (gitignored). Use `.env.example` as the template. DVC c
 
 Do not remove these lines.
 
-## Project status (as of 2026-08-08)
+## Project status (as of 2026-08-14)
 
 | Phase | Status |
 |---|---|
@@ -103,6 +104,6 @@ Do not remove these lines.
 | 3. Selección de modelo | ✅ Completado |
 | 4. Training pipeline definitivo | ✅ Completado |
 | 5. Simulación de drift + monitoreo | ✅ Completado |
-| 6. Reentrenamiento y promoción | ⬜ Pendiente |
+| 6. Reentrenamiento y promoción | ✅ Completado |
 | 7. Serving + dashboard | ⬜ Pendiente |
 | 8. Testing, CI/CD, despliegue | ⬜ Pendiente |

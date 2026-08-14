@@ -92,12 +92,12 @@ stages:
       size: 2327
     - path: src/churn_mlops/training/run_training.py
       hash: md5
-      md5: f6b7c8579d4adfc2f39a085b1c1d9fdc
-      size: 5252
+      md5: 18be59c4ee346c819cf2b7454e1c5370
+      size: 5958
     - path: src/churn_mlops/training/tuning.py
       hash: md5
-      md5: d8ca72d417a41f5a3f0b7910c8461960
-      size: 4330
+      md5: f6701c38d21f8193393a3f7e42f4f776
+      size: 4443
     params:
       configs/data.yaml:
         processed_dir: data/processed
@@ -106,6 +106,7 @@ stages:
         target_column: Churn Label
         test_size: 0.2
       configs/training.yaml:
+        best_params_output_path: models/best_params.json
         fixed_params:
           class_weight: balanced
           random_state: 42
@@ -162,6 +163,10 @@ stages:
               log: true
         registered_model_name: churn-lightgbm
     outs:
+    - path: models/best_params.json
+      hash: md5
+      md5: 27e0570f4f0b2cc06c6f14e8fca963e9
+      size: 366
     - path: models/lightgbm_pipeline.pkl
       hash: md5
       md5: 5fb28565a452a5acac193b5099390679

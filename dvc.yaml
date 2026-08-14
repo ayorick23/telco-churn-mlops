@@ -29,3 +29,4 @@ stages:
       - configs/training.yaml:
     outs:
       - models/lightgbm_pipeline.pkl
+      - models/best_params.json

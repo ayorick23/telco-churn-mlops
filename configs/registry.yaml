@@ -1,0 +1,40 @@
+# Configuración de Fase 6 — comparación champion/challenger y promoción vía
+# alias del MLflow Model Registry (no stages, deprecadas). Ver
+# docs/decisions/0012-reentrenamiento-y-promocion-fase-6.md. Se corre a mano
+# (no es stage de dvc.yaml):
+#   uv run python -m churn_mlops.registry.run_promotion
+
+mlflow:
+  experiment_name: phase6-promotion
+
+registered_model_name: churn-lightgbm # mismo nombre que configs/training.yaml
+champion_alias: champion
+
+# Métrica de decisión (clase positiva = churn=1) — misma familia que
+# selection_metric de Fase 3 y la optimizada por Optuna en Fase 4.
+promotion_metric: f1
+
+# Margen mínimo absoluto que el challenger debe superar al champion en
+# promotion_metric agregado (test.parquet completo) para promoverse. Valor
+# propuesto, no validado todavía contra la varianza real de F1 entre
+# corridas de este proyecto — recalibrar si varias corridas con semillas
+# distintas muestran que el F1 ya varía más que esto "de por sí".
+promotion_margin: 0.01
+
+# Columnas de segmento verificadas además del agregado (EDA
+# notebooks/01_eda.ipynb sección 6.1/8: baja cardinalidad, impacto
+# diferencial conocido en churn). No se dropean en build_features.py, así
+# que están disponibles tal cual en train.parquet/test.parquet.
+segment_columns:
+  - Contract
+  - Payment Method
+  - Internet Type
+
+# Cuánto puede caer el F1 de un segmento en el challenger respecto al
+# champion sin bloquear la promoción, aunque el agregado mejore. Más laxo
+# que promotion_margin porque los segmentos tienen menos filas (más ruido de
+# muestra) — igual que promotion_margin, valor propuesto a recalibrar con
+# corridas reales.
+segment_regression_tolerance: 0.03
+
+reports_dir: reports/registry

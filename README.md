@@ -27,7 +27,7 @@ Retener un cliente existente cuesta significativamente menos que adquirir uno nu
 ## Qué hace el sistema
 
 - Entrena y compara distintas familias de modelos (Regresión Logística como baseline, XGBoost, LightGBM, CatBoost) con tracking completo de experimentos en MLflow.
-- Registra el modelo ganador en un Model Registry con ciclo de vida de estados (Staging → Production).
+- Registra el modelo ganador en un Model Registry y promueve versiones vía el alias `champion` (API de aliases de MLflow, no el modelo de stages Staging→Production).
 - Sirve predicciones de churn vía una API REST (FastAPI), incluyendo explicabilidad por predicción individual (SHAP).
 - Simula la llegada de nuevos datos con distintos tipos de _drift_ documentados (covariate shift, concept drift) y los detecta automáticamente con Evidently AI.
 - Dispara reentrenamiento automático ante drift, compara el modelo nuevo (_challenger_) contra el actual (_champion_) con un criterio de promoción explícito, y solo lo reemplaza si es realmente mejor.
@@ -105,7 +105,7 @@ churn-mlops/
 | 3. Selección de modelo                       | ✅ Completado |
 | 4. Training pipeline definitivo              | ✅ Completado |
 | 5. Simulación de drift + monitoreo           | ✅ Completado |
-| 6. Reentrenamiento y promoción               | ⬜ Pendiente  |
+| 6. Reentrenamiento y promoción               | ✅ Completado |
 | 7. Serving + dashboard                       | ⬜ Pendiente  |
 | 8. Testing, CI/CD, despliegue, documentación | ⬜ Pendiente  |
 

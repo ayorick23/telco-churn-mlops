@@ -1,0 +1,18 @@
+# Configuración de Fase 6 — disparo de reentrenamiento a partir del resumen de
+# drift de Fase 5. Ver docs/decisions/0012-reentrenamiento-y-promocion-fase-6.md.
+# Distinto de configs/monitoring.yaml:drift_share (sensibilidad de DETECCIÓN de
+# Evidently, ADR 0011) — este es el umbral de DECISIÓN de reentrenar. Se corre
+# a mano:
+#   uv run python -m churn_mlops.monitoring.run_retrain_check
+
+drift_summary_path: reports/monitoring/drift_monitoring_results.csv
+
+# Columna del resumen de Fase 5 usada como señal de disparo.
+trigger_metric: dataset_drift_share
+
+# Umbral de ACCIÓN (no de detección): se recomienda reentrenar si el máximo de
+# trigger_metric en todo el resumen lo supera. Calibrado contra los resultados
+# reales de Fase 5 (que nunca superaron 0.128 incluso a intensidad máxima) para
+# que el trigger sea demostrable con los datos ya generados, sin ser tan
+# sensible como para saltar con el batch de control (intensity=0.0, ~0.026).
+retrain_threshold: 0.10

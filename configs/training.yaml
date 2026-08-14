@@ -15,6 +15,11 @@ registered_model_name: churn-lightgbm
 # .gitignore).
 model_output_path: models/lightgbm_pipeline.pkl
 
+# Últimos hiperparámetros ganadores de Optuna (fixed_params + study.best_params),
+# persistidos como JSON. Fase 6 (training/run_retrain.py) los reusa para
+# reentrenar sin volver a correr la búsqueda completa (ADR 0012).
+best_params_output_path: models/best_params.json
+
 # Misma columna de alta cardinalidad excluida en Fase 3 (ADR 0009): LightGBM
 # usa one-hot, no soporta City nativa como CatBoost.
 high_cardinality_columns:
