@@ -6,6 +6,7 @@ train.parquet), refitea el Pipeline ganador sobre todo train.parquet, evalúa un
     uv run python -m churn_mlops.training.run_training
 """
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -59,6 +60,16 @@ def save_pipeline_artifact(pipeline: Pipeline, output_path: str | Path) -> Path:
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, path)
+    return path
+
+
+def save_best_params(best_params: dict[str, Any], output_path: str | Path) -> Path:
+    """Serializa best_params (fixed_params + hiperparámetros de Optuna) a JSON;
+    permite a training/run_retrain.py reentrenar reusando el último tuning
+    ganador sin volver a correr Optuna (ADR 0012)."""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(best_params, indent=2), encoding="utf-8")
     return path
 
 
@@ -117,6 +128,7 @@ def main() -> None:
         X_train, y_train, high_cardinality_columns, training_config
     )
     best_params = {**training_config["fixed_params"], **study.best_params}
+    save_best_params(best_params, training_config["best_params_output_path"])
 
     pipeline = refit_best_pipeline(
         X_train, y_train, high_cardinality_columns, best_params

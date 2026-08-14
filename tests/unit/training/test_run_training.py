@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import joblib
@@ -9,6 +10,7 @@ from churn_mlops.training.run_training import (
     configure_mlflow,
     evaluate_and_log_final_model,
     refit_best_pipeline,
+    save_best_params,
     save_pipeline_artifact,
 )
 
@@ -77,6 +79,16 @@ def test_save_pipeline_artifact_writes_loadable_pickle(tmp_path: Path) -> None:
     np.testing.assert_array_equal(
         loaded_pipeline.predict(X_train), pipeline.predict(X_train)
     )
+
+
+def test_save_best_params_writes_readable_json(tmp_path: Path) -> None:
+    output_path = tmp_path / "best_params.json"
+
+    saved_path = save_best_params(BEST_PARAMS, output_path)
+    loaded = json.loads(saved_path.read_text(encoding="utf-8"))
+
+    assert saved_path.exists()
+    assert loaded == BEST_PARAMS
 
 
 def test_evaluate_and_log_final_model_logs_run_and_registers_model(
