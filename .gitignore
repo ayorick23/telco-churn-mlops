@@ -65,6 +65,14 @@ data/batches/
 # real se sube a DagsHub, dvc.lock trackea el hash. Análogo a data/processed/.
 models/
 
+# ── Reportes de monitoreo (Fase 5) ─────────────────────────────────────
+# El HTML/JSON de Evidently por batch ya se loguea a MLflow (fuente de
+# verdad, ver ADR 0011) y pesa varios MB por archivo — no va a git. Solo se
+# versiona el resumen cross-batch (CSV/MD), igual criterio que
+# reports/model_selection_*.
+reports/monitoring/*.html
+reports/monitoring/*.json
+
 # ── Variables de entorno / secretos ──────────────────────────────────
 .env
 .env.local

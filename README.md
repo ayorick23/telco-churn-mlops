@@ -104,7 +104,7 @@ churn-mlops/
 | 2. Data layer + features                     | ✅ Completado |
 | 3. Selección de modelo                       | ✅ Completado |
 | 4. Training pipeline definitivo              | ✅ Completado |
-| 5. Simulación de drift + monitoreo           | ⬜ Pendiente  |
+| 5. Simulación de drift + monitoreo           | ✅ Completado |
 | 6. Reentrenamiento y promoción               | ⬜ Pendiente  |
 | 7. Serving + dashboard                       | ⬜ Pendiente  |
 | 8. Testing, CI/CD, despliegue, documentación | ⬜ Pendiente  |

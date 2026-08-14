@@ -1,0 +1,62 @@
+# Configuración de Fase 5 — simulación de drift + detección con Evidently.
+# Ver docs/decisions/0011-simulacion-de-drift-y-monitoreo-fase-5.md.
+# Se corre a mano (no es stage de dvc.yaml, ver ADR 0011):
+#   uv run python -m churn_mlops.monitoring.run_monitoring
+
+mlflow:
+  experiment_name: phase5-monitoring
+
+# Carpeta donde se guardan los reportes HTML/JSON por batch + el resumen
+# cross-batch (CSV/MD), análoga a reports_dir en model_selection.yaml.
+reports_dir: reports/monitoring
+
+# Umbral de DataDriftPreset: share de columnas individualmente "drifted" a
+# partir del cual Evidently marca el dataset completo como "drifted". Es un
+# parámetro de sensibilidad de DETECCIÓN, no un trigger de reentrenamiento
+# (eso es Fase 6 — ver ADR 0011, no-goal explícito).
+drift_share: 0.5
+
+batch_generation:
+  random_state: 42
+  # Filas muestreadas (con reemplazo) de train.parquet por batch; simula el
+  # tamaño de un lote de scoring diario/semanal.
+  batch_size: 500
+  # Intensidades a barrer, 0.0 (idéntico a la referencia, sirve de control/
+  # baseline de "no drift") hasta 1.0 (perturbación completa, ver drift_specs).
+  # Genera len(intensity_schedule) batches, cada uno con su propio nombre y run
+  # de MLflow.
+  intensity_schedule: [0.0, 0.25, 0.5, 0.75, 1.0]
+
+  # Qué columnas se perturban y cómo. Mismo patrón de despacho por `type` que
+  # optuna.search_space en training.yaml (ver tuning.py::build_search_space).
+  # Los parámetros numéricos son los valores a intensidad=1.0; a intensidad
+  # intermedia i se interpolan linealmente por i. Historia simulada: "suba de
+  # precios + shift hacia contratos mensuales".
+  drift_specs:
+    Monthly Charge:
+      type: numeric_shift
+      # A intensidad 1.0: +15 en la media, sin cambiar el std (suba de precios
+      # pareja, no un cambio de dispersión).
+      mean_shift: 15.0
+      std_shift: 0.0
+    Tenure in Months:
+      type: numeric_shift
+      # A intensidad 1.0: -8 meses en la media (más clientes nuevos entrando).
+      mean_shift: -8.0
+      std_shift: 0.0
+      clip_min: 0
+    Contract:
+      type: categorical_reweight
+      # A intensidad 1.0: la distribución objetivo de categorías. A intensidad
+      # intermedia i se interpola linealmente entre la distribución empírica de
+      # train.parquet y esta distribución objetivo.
+      target_distribution:
+        Month-to-Month: 0.70
+        One Year: 0.20
+        Two Year: 0.10
+    Payment Method:
+      type: categorical_reweight
+      target_distribution:
+        Bank Withdrawal: 0.35
+        Credit Card: 0.35
+        Mailed Check: 0.30
