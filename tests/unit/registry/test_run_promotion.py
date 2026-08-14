@@ -1,23 +1,20 @@
 from pathlib import Path
 
 import mlflow
-import mlflow.lightgbm
 import mlflow.sklearn
 import numpy as np
 import pandas as pd
 import pytest
 from churn_mlops.registry.comparison import decide_promotion
-from churn_mlops.registry.mlflow_client import (
-    get_champion_version,
-    load_pipeline_from_run,
-    promote_challenger,
-)
+from churn_mlops.registry.mlflow_client import get_champion_version, promote_challenger
 from churn_mlops.registry.run_promotion import (
     configure_mlflow,
     evaluate_pipeline,
+    load_local_pipeline,
     save_promotion_report,
 )
 from churn_mlops.training.model_specs import build_lightgbm_pipeline
+from churn_mlops.training.run_training import save_pipeline_artifact
 
 MODEL_NAME = "test-churn-lightgbm-promotion"
 REGISTRY_CONFIG = {
@@ -44,22 +41,25 @@ def _dataset(n: int = 60) -> tuple[pd.DataFrame, pd.Series]:
     return X, y
 
 
-def _log_and_register(model_name: str, X: pd.DataFrame, y_for_fit: pd.Series) -> str:
+def _fit_pipeline(X: pd.DataFrame, y_for_fit: pd.Series):
     pipeline = build_lightgbm_pipeline(
         X, [], {"n_estimators": 20, "random_state": 42, "verbose": -1}
     )
     pipeline.fit(X, y_for_fit)
+    return pipeline
 
+
+def _register_version(model_name: str, pipeline) -> str:
+    """Registra una versión nueva en el Model Registry (metadata: versión +
+    disponibilidad para alias). Ya no hace falta loguear artifacts
+    descargables — run_promotion.py lee los bytes del pipeline de disco, no
+    de MLflow (ADR 0012)."""
     with mlflow.start_run():
-        mlflow.sklearn.log_model(
-            pipeline.named_steps["preprocess"],
-            artifact_path="preprocessor",
-            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_PICKLE,
-        )
-        model_info = mlflow.lightgbm.log_model(
-            pipeline.named_steps["model"],
+        model_info = mlflow.sklearn.log_model(
+            pipeline,
             artifact_path="model",
             registered_model_name=model_name,
+            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_PICKLE,
         )
     return model_info.registered_model_version
 
@@ -75,46 +75,60 @@ def mlflow_client(
     return mlflow.MlflowClient()
 
 
+def test_load_local_pipeline_round_trips(tmp_path: Path) -> None:
+    X, y = _dataset()
+    pipeline = _fit_pipeline(X, y)
+    path = tmp_path / "pipeline.pkl"
+    save_pipeline_artifact(pipeline, path)
+
+    loaded = load_local_pipeline(path)
+
+    np.testing.assert_array_equal(loaded.predict(X), pipeline.predict(X))
+
+
 def test_bootstrap_promotes_without_comparing(
-    mlflow_client: mlflow.MlflowClient,
+    mlflow_client: mlflow.MlflowClient, tmp_path: Path
 ) -> None:
     X, y = _dataset()
-    challenger_version = _log_and_register(MODEL_NAME, X, y)
+    pipeline = _fit_pipeline(X, y)
+    challenger_version = _register_version(MODEL_NAME, pipeline)
+    champion_path = tmp_path / "champion.pkl"
 
     champion = get_champion_version(mlflow_client, MODEL_NAME, "champion")
     assert champion is None  # caso bootstrap
 
     promote_challenger(mlflow_client, MODEL_NAME, "champion", challenger_version)
+    save_pipeline_artifact(pipeline, champion_path)
 
     result = mlflow_client.get_model_version_by_alias(MODEL_NAME, "champion")
     assert result.version == challenger_version
+    np.testing.assert_array_equal(
+        load_local_pipeline(champion_path).predict(X), pipeline.predict(X)
+    )
 
 
-def test_challenger_wins_and_gets_promoted(mlflow_client: mlflow.MlflowClient) -> None:
+def test_challenger_wins_and_gets_promoted(
+    mlflow_client: mlflow.MlflowClient, tmp_path: Path
+) -> None:
     X, y = _dataset()
     y_shuffled = pd.Series(
         np.random.default_rng(1).permutation(y.to_numpy()), name=y.name
     )
+    weak_pipeline = _fit_pipeline(X, y_shuffled)  # champion débil
+    strong_pipeline = _fit_pipeline(X, y)  # challenger bueno
 
-    champion_version = _log_and_register(MODEL_NAME, X, y_shuffled)  # modelo débil
+    champion_version = _register_version(MODEL_NAME, weak_pipeline)
     mlflow_client.set_registered_model_alias(MODEL_NAME, "champion", champion_version)
-    challenger_version = _log_and_register(MODEL_NAME, X, y)  # modelo bueno
+    champion_path = tmp_path / "champion.pkl"
+    save_pipeline_artifact(weak_pipeline, champion_path)
 
-    champion_model_version = mlflow_client.get_model_version(
-        MODEL_NAME, champion_version
-    )
-    challenger_model_version = mlflow_client.get_model_version(
-        MODEL_NAME, challenger_version
-    )
-
-    champion_pipeline = load_pipeline_from_run(champion_model_version.run_id)
-    challenger_pipeline = load_pipeline_from_run(challenger_model_version.run_id)
+    challenger_version = _register_version(MODEL_NAME, strong_pipeline)
 
     champion_metrics, champion_segments = evaluate_pipeline(
-        champion_pipeline, X, y, REGISTRY_CONFIG["segment_columns"]
+        load_local_pipeline(champion_path), X, y, REGISTRY_CONFIG["segment_columns"]
     )
     challenger_metrics, challenger_segments = evaluate_pipeline(
-        challenger_pipeline, X, y, REGISTRY_CONFIG["segment_columns"]
+        strong_pipeline, X, y, REGISTRY_CONFIG["segment_columns"]
     )
 
     decision = decide_promotion(
@@ -127,37 +141,37 @@ def test_challenger_wins_and_gets_promoted(mlflow_client: mlflow.MlflowClient) -
     assert decision.promote is True
 
     promote_challenger(mlflow_client, MODEL_NAME, "champion", challenger_version)
+    save_pipeline_artifact(strong_pipeline, champion_path)
 
     result = mlflow_client.get_model_version_by_alias(MODEL_NAME, "champion")
     assert result.version == challenger_version
+    np.testing.assert_array_equal(
+        load_local_pipeline(champion_path).predict(X), strong_pipeline.predict(X)
+    )
 
 
-def test_challenger_loses_and_alias_is_unchanged(
-    mlflow_client: mlflow.MlflowClient,
+def test_challenger_loses_and_alias_and_file_are_unchanged(
+    mlflow_client: mlflow.MlflowClient, tmp_path: Path
 ) -> None:
     X, y = _dataset()
     y_shuffled = pd.Series(
         np.random.default_rng(1).permutation(y.to_numpy()), name=y.name
     )
+    strong_pipeline = _fit_pipeline(X, y)  # champion bueno
+    weak_pipeline = _fit_pipeline(X, y_shuffled)  # challenger débil
 
-    champion_version = _log_and_register(MODEL_NAME, X, y)  # modelo bueno
+    champion_version = _register_version(MODEL_NAME, strong_pipeline)
     mlflow_client.set_registered_model_alias(MODEL_NAME, "champion", champion_version)
-    challenger_version = _log_and_register(MODEL_NAME, X, y_shuffled)  # modelo débil
+    champion_path = tmp_path / "champion.pkl"
+    save_pipeline_artifact(strong_pipeline, champion_path)
 
-    champion_model_version = mlflow_client.get_model_version(
-        MODEL_NAME, champion_version
-    )
-    challenger_model_version = mlflow_client.get_model_version(
-        MODEL_NAME, challenger_version
-    )
-    champion_pipeline = load_pipeline_from_run(champion_model_version.run_id)
-    challenger_pipeline = load_pipeline_from_run(challenger_model_version.run_id)
+    _register_version(MODEL_NAME, weak_pipeline)
 
     champion_metrics, champion_segments = evaluate_pipeline(
-        champion_pipeline, X, y, REGISTRY_CONFIG["segment_columns"]
+        load_local_pipeline(champion_path), X, y, REGISTRY_CONFIG["segment_columns"]
     )
     challenger_metrics, challenger_segments = evaluate_pipeline(
-        challenger_pipeline, X, y, REGISTRY_CONFIG["segment_columns"]
+        weak_pipeline, X, y, REGISTRY_CONFIG["segment_columns"]
     )
 
     decision = decide_promotion(
@@ -169,9 +183,12 @@ def test_challenger_loses_and_alias_is_unchanged(
     )
     assert decision.promote is False
 
-    # alias NO se mueve porque no se llama a promote_challenger en este caso
+    # ni el alias ni el archivo local del champion se tocan en este caso
     result = mlflow_client.get_model_version_by_alias(MODEL_NAME, "champion")
     assert result.version == champion_version
+    np.testing.assert_array_equal(
+        load_local_pipeline(champion_path).predict(X), strong_pipeline.predict(X)
+    )
 
 
 def test_configure_mlflow_sets_tracking_uri_from_env(
@@ -186,22 +203,21 @@ def test_configure_mlflow_sets_tracking_uri_from_env(
     assert mlflow.get_tracking_uri() == tracking_uri
 
 
-def test_save_promotion_report_bootstrap_writes_csv_and_md(
-    mlflow_client: mlflow.MlflowClient, tmp_path: Path
-) -> None:
+def test_save_promotion_report_bootstrap_writes_csv_and_md(tmp_path: Path) -> None:
     X, y = _dataset()
-    version = _log_and_register(MODEL_NAME, X, y)
-    challenger_version = mlflow_client.get_model_version(MODEL_NAME, version)
+    pipeline = _fit_pipeline(X, y)
+    challenger_path = tmp_path / "challenger.pkl"
+    save_pipeline_artifact(pipeline, challenger_path)
     challenger_metrics, _ = evaluate_pipeline(
-        load_pipeline_from_run(challenger_version.run_id),
-        X,
-        y,
-        REGISTRY_CONFIG["segment_columns"],
+        load_local_pipeline(challenger_path), X, y, REGISTRY_CONFIG["segment_columns"]
     )
-    output_dir = tmp_path / "reports"
 
+    class _FakeVersion:
+        version = "1"
+
+    output_dir = tmp_path / "reports"
     csv_path, summary_path = save_promotion_report(
-        challenger_version, None, challenger_metrics, None, None, output_dir
+        _FakeVersion(), None, challenger_metrics, None, None, output_dir
     )
 
     assert csv_path.exists()
@@ -211,27 +227,23 @@ def test_save_promotion_report_bootstrap_writes_csv_and_md(
     assert list(rows["role"]) == ["challenger"]
 
 
-def test_save_promotion_report_with_decision_includes_both_rows(
-    mlflow_client: mlflow.MlflowClient, tmp_path: Path
-) -> None:
+def test_save_promotion_report_with_decision_includes_both_rows(tmp_path: Path) -> None:
     X, y = _dataset()
-    challenger_version = mlflow_client.get_model_version(
-        MODEL_NAME, _log_and_register(MODEL_NAME, X, y)
-    )
-    champion_version = mlflow_client.get_model_version(
-        MODEL_NAME, _log_and_register(MODEL_NAME, X, y)
-    )
+    pipeline = _fit_pipeline(X, y)
+    pipeline_path = tmp_path / "pipeline.pkl"
+    save_pipeline_artifact(pipeline, pipeline_path)
     metrics, _ = evaluate_pipeline(
-        load_pipeline_from_run(challenger_version.run_id),
-        X,
-        y,
-        REGISTRY_CONFIG["segment_columns"],
+        load_local_pipeline(pipeline_path), X, y, REGISTRY_CONFIG["segment_columns"]
     )
     decision = decide_promotion(0.5, 0.6, {}, {}, REGISTRY_CONFIG)
-    output_dir = tmp_path / "reports"
 
+    class _FakeVersion:
+        def __init__(self, version: str) -> None:
+            self.version = version
+
+    output_dir = tmp_path / "reports"
     csv_path, summary_path = save_promotion_report(
-        challenger_version, champion_version, metrics, metrics, decision, output_dir
+        _FakeVersion("2"), _FakeVersion("1"), metrics, metrics, decision, output_dir
     )
 
     rows = pd.read_csv(csv_path)

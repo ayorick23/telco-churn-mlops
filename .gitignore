@@ -61,9 +61,14 @@ data/processed/
 data/features/
 data/batches/
 
-# models/ es gestionado por DVC vía el stage train_model (dvc.yaml): el .pkl
-# real se sube a DagsHub, dvc.lock trackea el hash. Análogo a data/processed/.
-models/
+# models/*.pkl y models/*.json: el contenido real se sube a DagsHub vía DVC.
+# lightgbm_pipeline.pkl y best_params.json se trackean vía el stage
+# train_model (dvc.yaml + dvc.lock, análogo a data/processed/);
+# champion_pipeline.pkl se trackea aparte vía `dvc add` (ADR 0012, no es
+# output de un stage) — su .pkl.dvc SÍ va a git, análogo a
+# data/raw/telco.csv.dvc.
+models/*.pkl
+models/*.json
 
 # ── Reportes de monitoreo (Fase 5) ─────────────────────────────────────
 # El HTML/JSON de Evidently por batch ya se loguea a MLflow (fuente de

@@ -9,7 +9,6 @@ import pytest
 from churn_mlops.registry.mlflow_client import (
     get_champion_version,
     get_latest_version,
-    load_pipeline_from_run,
     promote_challenger,
 )
 from churn_mlops.training.model_specs import build_lightgbm_pipeline
@@ -97,20 +96,6 @@ def test_get_latest_version_returns_highest_version_number(
     result = get_latest_version(mlflow_client, MODEL_NAME)
 
     assert result.version == second_version
-
-
-def test_load_pipeline_from_run_reconstructs_a_working_pipeline(
-    mlflow_client: mlflow.MlflowClient,
-) -> None:
-    version = _log_and_register_version(MODEL_NAME)
-    model_version = mlflow_client.get_model_version(MODEL_NAME, version)
-    X, _ = _sample_data()
-
-    pipeline = load_pipeline_from_run(model_version.run_id)
-    predictions = pipeline.predict(X)
-
-    assert len(predictions) == len(X)
-    assert set(predictions.tolist()) <= {0, 1}
 
 
 def test_promote_challenger_moves_alias_to_the_given_version(

@@ -10,6 +10,14 @@ mlflow:
 registered_model_name: churn-lightgbm # mismo nombre que configs/training.yaml
 champion_alias: champion
 
+# Copia estable del pipeline del champion actual, actualizada acá (no por un
+# stage de dvc.yaml) cada vez que run_promotion.py promueve. El Registry de
+# MLflow queda solo como metadata (qué versión es champion); los bytes del
+# modelo se leen de este archivo, versionado por DVC vía `dvc add` (no vía
+# stage — ver ADR 0012, motivo: el proxy de artifacts de MLflow en DagsHub no
+# es confiable para descargas).
+champion_pipeline_path: models/champion_pipeline.pkl
+
 # Métrica de decisión (clase positiva = churn=1) — misma familia que
 # selection_metric de Fase 3 y la optimizada por Optuna en Fase 4.
 promotion_metric: f1

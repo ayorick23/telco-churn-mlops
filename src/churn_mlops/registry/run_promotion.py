@@ -3,6 +3,16 @@ registrada de churn-lightgbm) contra el champion actual (alias `champion`)
 sobre test.parquet completo + cada segmento de configs/registry.yaml, decide
 si promueve (ADR 0012) y, si corresponde, mueve el alias.
 
+Los bytes de los pipelines NO se descargan del Model Registry (ADR 0012: el
+proxy de artifacts de MLflow en DagsHub no es confiable para descargas). El
+challenger se lee del `.pkl` que run_training.py/run_retrain.py acaban de
+dejar en disco (`configs/training.yaml:model_output_path`); el champion se
+lee de una copia estable versionada por DVC
+(`configs/registry.yaml:champion_pipeline_path`), actualizada acá mismo cada
+vez que se promueve. El Registry + el alias `champion` siguen siendo la
+fuente de verdad de METADATA (qué versión es cuál) — solo dejan de ser el
+mecanismo para traer los bytes del modelo.
+
 Caso bootstrap: si no existe ningún champion todavía, promueve el challenger
 sin comparar — no hay contra qué comparar. Loguea un run de resumen a MLflow
 con la decisión completa y guarda un reporte CSV+MD en reports/registry/
@@ -11,6 +21,11 @@ No es stage de dvc.yaml (mismo precedente, ADR 0009/0011). Se corre a mano,
 después de `dvc repro train_model` o de `training.run_retrain`:
 
     uv run python -m churn_mlops.registry.run_promotion
+
+Nota operativa: si este script promueve, `champion_pipeline_path` cambia por
+fuera de `dvc.yaml` — hace falta `dvc add` + `dvc push` después para dejarlo
+versionado y disponible para otra máquina/colaborador (ver ADR 0012, mismo
+tipo de fricción que `dvc commit train_model` tras `run_retrain.py`).
 """
 
 import os
@@ -18,6 +33,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import joblib
 import mlflow
 import pandas as pd
 from dotenv import load_dotenv
@@ -35,12 +51,12 @@ from churn_mlops.registry.comparison import PromotionDecision, decide_promotion
 from churn_mlops.registry.mlflow_client import (
     get_champion_version,
     get_latest_version,
-    load_pipeline_from_run,
     promote_challenger,
 )
 from churn_mlops.registry.segment_evaluation import compute_segment_metrics
 from churn_mlops.training.dataset import load_processed_datasets
 from churn_mlops.training.evaluation import compute_classification_metrics
+from churn_mlops.training.run_training import save_pipeline_artifact
 
 
 def configure_mlflow(registry_config: dict[str, Any]) -> None:
@@ -49,6 +65,15 @@ def configure_mlflow(registry_config: dict[str, Any]) -> None:
     load_dotenv()
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     mlflow.set_experiment(registry_config["mlflow"]["experiment_name"])
+
+
+def load_local_pipeline(path: str | Path) -> Pipeline:
+    """Carga un Pipeline serializado por joblib desde disco (ADR 0012) —
+    usado tanto para el challenger recién entrenado como para la copia
+    estable del champion. Es la contraparte de lectura de
+    training/run_training.py::save_pipeline_artifact."""
+    pipeline: Pipeline = joblib.load(Path(path))
+    return pipeline
 
 
 def evaluate_pipeline(
@@ -131,19 +156,28 @@ def save_promotion_report(
 def main() -> None:
     registry_config = load_yaml_config("configs/registry.yaml")
     data_config = load_yaml_config("configs/data.yaml")
+    training_config = load_yaml_config("configs/training.yaml")
     configure_mlflow(registry_config)
 
     model_name = registry_config["registered_model_name"]
     champion_alias = registry_config["champion_alias"]
     segment_columns = registry_config["segment_columns"]
+    champion_pipeline_path = Path(registry_config["champion_pipeline_path"])
 
     client = mlflow.MlflowClient()
     challenger_version = get_latest_version(client, model_name)
     champion_version = get_champion_version(client, model_name, champion_alias)
 
+    if champion_version is not None and not champion_pipeline_path.exists():
+        raise FileNotFoundError(
+            f"Existe un champion registrado (alias '{champion_alias}') en el "
+            f"Model Registry pero no {champion_pipeline_path} en disco — "
+            "correr `dvc pull` primero."
+        )
+
     _, X_test, _, y_test = load_processed_datasets(data_config)
 
-    challenger_pipeline = load_pipeline_from_run(challenger_version.run_id)
+    challenger_pipeline = load_local_pipeline(training_config["model_output_path"])
     challenger_metrics, challenger_segments = evaluate_pipeline(
         challenger_pipeline, X_test, y_test, segment_columns
     )
@@ -160,6 +194,7 @@ def main() -> None:
             promote_challenger(
                 client, model_name, champion_alias, challenger_version.version
             )
+            save_pipeline_artifact(challenger_pipeline, champion_pipeline_path)
             csv_path, summary_path = save_promotion_report(
                 challenger_version,
                 None,
@@ -176,7 +211,7 @@ def main() -> None:
             )
             return
 
-        champion_pipeline = load_pipeline_from_run(champion_version.run_id)
+        champion_pipeline = load_local_pipeline(champion_pipeline_path)
         champion_metrics, champion_segments = evaluate_pipeline(
             champion_pipeline, X_test, y_test, segment_columns
         )
@@ -199,6 +234,7 @@ def main() -> None:
             promote_challenger(
                 client, model_name, champion_alias, challenger_version.version
             )
+            save_pipeline_artifact(challenger_pipeline, champion_pipeline_path)
 
         csv_path, summary_path = save_promotion_report(
             challenger_version,

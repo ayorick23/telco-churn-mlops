@@ -1,0 +1,5 @@
+outs:
+- md5: f5aa8119449634354d69c3857ac06f1a
+  size: 4979199
+  hash: md5
+  path: champion_pipeline.pkl
