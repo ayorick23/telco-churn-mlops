@@ -4,17 +4,14 @@ stages (`transition_model_version_stage`, deprecada desde MLflow 2.9 — ADR
 0012). Aísla al resto de registry/ del cliente concreto, mismo rol que
 drift_detection.py respecto a Evidently en Fase 5.
 
-El Model Registry solo versiona el `LGBMClassifier` (run_training.py loguea
-el preprocesador aparte, artifact_path="preprocessor", en el mismo run — ver
-ADR 0012). Por eso evaluar cualquier `ModelVersion` requiere ir a su
-`run_id` de origen y reconstruir el Pipeline completo combinando ambos
-artifacts — ver load_pipeline_from_run."""
+Solo maneja METADATA del Registry (qué versión existe, cuál es el alias
+`champion`) — nunca descarga artifacts desde acá. Los bytes del pipeline
+(challenger/champion) se resuelven en run_promotion.py desde archivos
+locales versionados por DVC, no desde el Registry (ADR 0012: el proxy de
+artifacts de MLflow en DagsHub resultó no ser confiable para descargas)."""
 
 import mlflow
-import mlflow.lightgbm
-import mlflow.sklearn
 from mlflow.entities.model_registry import ModelVersion
-from sklearn.pipeline import Pipeline
 
 
 def get_champion_version(
@@ -35,15 +32,6 @@ def get_latest_version(client: mlflow.MlflowClient, model_name: str) -> ModelVer
     `get_latest_versions` (API de stages, deprecada)."""
     versions = client.search_model_versions(f"name='{model_name}'")
     return max(versions, key=lambda v: int(v.version))
-
-
-def load_pipeline_from_run(run_id: str) -> Pipeline:
-    """Reconstruye el Pipeline completo (preprocesador + modelo) desde los dos
-    artifacts logueados en el run de origen — el Registry solo versiona el
-    segundo."""
-    preprocessor = mlflow.sklearn.load_model(f"runs:/{run_id}/preprocessor")
-    model = mlflow.lightgbm.load_model(f"runs:/{run_id}/model")
-    return Pipeline([("preprocess", preprocessor), ("model", model)])
 
 
 def promote_challenger(
