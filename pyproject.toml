@@ -49,7 +49,10 @@ dependencies = [
     "pandera[mypy]>=0.20",
 
     # ── Monitoreo de drift ─────────────────────────────────────────
-    "evidently>=0.4",
+    # La API cambió por completo entre 0.4 y 0.7 (Report/Dataset/Preset
+    # reemplazó a Dashboard/model_profile) — código de monitoring/ escrito y
+    # verificado contra 0.7.x (ADR 0011), no asumir compatibilidad con 0.4.
+    "evidently>=0.7",
 
     # ── Serving ───────────────────────────────────────────────────
     "fastapi>=0.110",

@@ -21,6 +21,7 @@ uv run pre-commit install  # install git hooks (one-time, after cloning)
 ```
 
 DVC:
+
 ```bash
 dvc pull                   # download data after cloning (requires DagsHub credentials)
 dvc repro                  # run the full pipeline (data → features → training)
@@ -29,6 +30,7 @@ dvc push                   # upload new data versions to DagsHub
 ```
 
 Docker:
+
 ```bash
 docker compose up          # start all services (MLflow, API, dashboard, monitoring)
 docker compose up mlflow   # start a single service
@@ -38,11 +40,11 @@ docker compose up mlflow   # start a single service
 
 Unidirectional layer dependency — each layer only imports from layers above it:
 
-```
+```plain text
 Data → Features → Training → Registry/Serving → Monitoring → Presentation
 ```
 
-```
+```plain text
 src/churn_mlops/
 ├── data/          # ingestion + Pandera schema validation + drift injection (batches)
 ├── features/      # feature engineering only — no model logic
@@ -100,7 +102,7 @@ Do not remove these lines.
 | 2. Data layer + features | ✅ Completado |
 | 3. Selección de modelo | ✅ Completado |
 | 4. Training pipeline definitivo | ✅ Completado |
-| 5. Simulación de drift + monitoreo | ⬜ Pendiente |
+| 5. Simulación de drift + monitoreo | ✅ Completado |
 | 6. Reentrenamiento y promoción | ⬜ Pendiente |
 | 7. Serving + dashboard | ⬜ Pendiente |
 | 8. Testing, CI/CD, despliegue | ⬜ Pendiente |
