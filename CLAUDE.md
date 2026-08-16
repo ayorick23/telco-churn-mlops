@@ -95,7 +95,7 @@ Credentials go in `.env` (gitignored). Use `.env.example` as the template. DVC c
 
 Do not remove these lines.
 
-## Project status (as of 2026-08-14)
+## Project status (as of 2026-08-16)
 
 | Phase | Status |
 |---|---|
@@ -105,5 +105,5 @@ Do not remove these lines.
 | 4. Training pipeline definitivo | ✅ Completado |
 | 5. Simulación de drift + monitoreo | ✅ Completado |
 | 6. Reentrenamiento y promoción | ✅ Completado |
-| 7. Serving + dashboard | ⬜ Pendiente |
+| 7. Serving + dashboard | ✅ Completado |
 | 8. Testing, CI/CD, despliegue | ⬜ Pendiente |
