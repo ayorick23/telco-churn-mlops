@@ -22,6 +22,8 @@ name = "churn-mlops"
 version = "0.1.0"
 description = "End-to-end MLOps system for telco customer churn prediction"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 
 dependencies = [
     # ── Data ──────────────────────────────────────────────────────

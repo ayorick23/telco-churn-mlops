@@ -2,7 +2,7 @@
 
 > 🚧 **Proyecto en desarrollo activo.** Este README se actualizará a medida que avancen las fases del roadmap.
 
-Sistema end-to-end de predicción de churn de clientes que va más allá de entrenar un modelo: implementa el ciclo completo de MLOps — tracking de experimentos, registro y promoción de modelos, detección de drift, y reentrenamiento automático — sobre un dataset de churn de telecomunicaciones (Telco Customer Churn).
+Sistema end-to-end de predicción de churn de clientes que va más allá de entrenar un modelo: implementa el ciclo completo de MLOps — tracking de experimentos, registro y promoción de modelos, detección de drift, y reentrenamiento asistido — sobre un dataset de churn de telecomunicaciones (Telco Customer Churn).
 
 El objetivo del proyecto no es solo predecir qué clientes van a cancelar su servicio, sino demostrar cómo se mantiene un modelo de ML confiable en producción a lo largo del tiempo, a medida que los datos y el comportamiento de los clientes cambian.
 
@@ -19,6 +19,7 @@ El objetivo del proyecto no es solo predecir qué clientes van a cancelar su ser
   - [Estado del proyecto](#estado-del-proyecto)
   - [Cómo ejecutarlo](#cómo-ejecutarlo)
   - [Roadmap](#roadmap)
+  - [Licencia](#licencia)
 
 ## Problema de negocio
 
@@ -29,9 +30,9 @@ Retener un cliente existente cuesta significativamente menos que adquirir uno nu
 - Entrena y compara distintas familias de modelos (Regresión Logística como baseline, XGBoost, LightGBM, CatBoost) con tracking completo de experimentos en MLflow.
 - Registra el modelo ganador en un Model Registry y promueve versiones vía el alias `champion` (API de aliases de MLflow, no el modelo de stages Staging→Production).
 - Sirve predicciones de churn vía una API REST (FastAPI), incluyendo explicabilidad por predicción individual (SHAP).
-- Simula la llegada de nuevos datos con distintos tipos de _drift_ documentados (covariate shift, concept drift) y los detecta automáticamente con Evidently AI.
-- Dispara reentrenamiento automático ante drift, compara el modelo nuevo (_challenger_) contra el actual (_champion_) con un criterio de promoción explícito, y solo lo reemplaza si es realmente mejor.
-- Expone un dashboard (Streamlit) con predicciones, métricas del modelo en producción, alertas de drift e historial de reentrenamientos.
+- Simula la llegada de nuevos datos con distintos tipos de _drift_ documentados (covariate shift, concept drift) y los detecta con Evidently AI.
+- Evalúa si el drift detectado amerita reentrenar, compara el modelo nuevo (_challenger_) contra el actual (_champion_) con un criterio de promoción explícito, y solo lo reemplaza si es realmente mejor — reentrenar y promover son pasos deliberadamente manuales, no un orquestador automático (ver ADR 0012).
+- Expone un dashboard (Streamlit) con predicciones interactivas y su explicación en SHAP, métricas del modelo en producción, historial de drift, y una sección de operaciones para disparar monitoreo/reentrenamiento/promoción desde la UI.
 
 ## Qué no hace (por diseño)
 
@@ -87,12 +88,16 @@ churn-mlops/
 ├── tests/                 # unit, integration, data_validation
 ├── configs/               # configuración por ambiente
 ├── data/                  # gestionado por DVC
+├── models/                # pipelines serializados, gestionado por DVC
+├── reports/               # resultados de selección de modelo, drift y promoción
 ├── notebooks/             # solo exploración
+├── docs/decisions/        # ADRs — decisiones de arquitectura y tooling
 ├── docker/
 ├── .github/workflows/
 ├── docker-compose.yml
 ├── pyproject.toml
 ├── dvc.yaml
+├── LICENSE
 └── README.md
 ```
 
@@ -106,35 +111,77 @@ churn-mlops/
 | 4. Training pipeline definitivo              | ✅ Completado |
 | 5. Simulación de drift + monitoreo           | ✅ Completado |
 | 6. Reentrenamiento y promoción               | ✅ Completado |
-| 7. Serving + dashboard                       | ⬜ Pendiente  |
+| 7. Serving + dashboard                       | ✅ Completado |
 | 8. Testing, CI/CD, despliegue, documentación | ⬜ Pendiente  |
 
 ## Cómo ejecutarlo
 
-> Sección provisional — se completará a medida que el proyecto avance.
+Requiere Python 3.11 (gestionado por [uv](https://docs.astral.sh/uv/)) y
+credenciales de DagsHub para `dvc pull`/MLflow (ver `.env.example`).
 
 ```bash
 # clonar el repo
-git clone <url-del-repo>
-cd churn-mlops
+git clone https://github.com/ayorick23/telco-churn-mlops.git
+cd telco-churn-mlops
 
-# instalar dependencias con uv
+# instalar dependencias (crea .venv con Python 3.11)
 uv sync
 
-# descargar los datos versionados con DVC (requiere credenciales de DagsHub)
+# copiar el template de variables de entorno y completar credenciales de DagsHub
+cp .env.example .env
+
+# descargar datos y modelos versionados con DVC
 dvc pull
-
-# correr el pipeline: valida el CSV crudo contra el schema de Pandera y genera
-# data/processed/train.parquet y test.parquet
-dvc repro
-
-# levantar el entorno completo (entrenamiento, MLflow, monitoreo)
-docker compose up
 ```
+
+### Pipeline de datos y entrenamiento
+
+```bash
+# valida el CSV crudo contra el schema de Pandera, genera train/test.parquet
+# y entrena+tunea el pipeline de LightGBM (Optuna)
+dvc repro
+```
+
+### Servir el modelo
+
+```bash
+# API de predicción (FastAPI + SHAP) — docs interactivas en /docs
+uv run uvicorn churn_mlops.serving.api.main:app --reload --port 8000
+
+# en otra terminal: dashboard (Streamlit)
+uv run streamlit run src/churn_mlops/dashboard/app.py
+```
+
+### Monitoreo y reentrenamiento (manual — ver ADR 0012)
+
+```bash
+uv run python -m churn_mlops.monitoring.run_monitoring       # simula drift y lo detecta con Evidently
+uv run python -m churn_mlops.monitoring.run_retrain_check    # ¿el drift amerita reentrenar?
+uv run python -m churn_mlops.training.run_retrain             # reentrena el challenger
+uv run python -m churn_mlops.registry.run_promotion            # compara y promueve a champion si corresponde
+```
+
+Los mismos pasos de monitoreo/reentrenamiento/promoción también se pueden
+disparar desde la pestaña "Operaciones" del dashboard.
+
+### Tests y calidad de código
+
+```bash
+uv run pytest              # suite completa
+uv run ruff check .        # lint
+uv run mypy src/           # type-check
+```
+
+> Docker y despliegue (Render/Railway + Hugging Face Spaces) quedan para la
+> Fase 8 — `docker-compose.yml` está reservado pero todavía vacío.
 
 ## Roadmap
 
 El roadmap del proyecto son las 8 fases de la tabla de "Estado del proyecto". Las decisiones de diseño y tooling tomadas en cada fase quedan registradas como ADRs en [`docs/decisions/`](docs/decisions/). El EDA completo de la Fase 1 está en [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
+
+## Licencia
+
+Distribuido bajo licencia [MIT](LICENSE).
 
 ---
 
