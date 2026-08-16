@@ -1,0 +1,21 @@
+# Configuración de Fase 7 — dashboard (Streamlit).
+# Ver docs/decisions/0013-serving-y-dashboard-fase-7.md.
+# Se levanta a mano:
+#   uv run streamlit run src/churn_mlops/dashboard/app.py
+
+# Base URL de la API de Fase 7. Override vía env var CHURN_API_BASE_URL
+# cuando la API esté desplegada (Fase 8) en un host distinto al dashboard.
+api_base_url: http://localhost:8000
+
+# Rutas de reportes leídas directo (no se duplican acá): reusa
+# reports_dir de configs/model_selection.yaml, configs/monitoring.yaml y
+# configs/registry.yaml.
+report_configs:
+  model_selection: configs/model_selection.yaml
+  monitoring: configs/monitoring.yaml
+  registry: configs/registry.yaml
+
+# Logo mostrado arriba del sidebar (st.logo). Opcional: si el archivo no
+# existe, el dashboard simplemente no muestra logo — no rompe. Colocar el
+# archivo propio en esta ruta para activarlo.
+logo_path: assets/logo.png

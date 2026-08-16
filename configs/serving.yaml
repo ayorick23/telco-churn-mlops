@@ -1,0 +1,19 @@
+# Configuración de Fase 7 — API de predicción (FastAPI).
+# Ver docs/decisions/0013-serving-y-dashboard-fase-7.md.
+# Se levanta a mano (no es stage de dvc.yaml):
+#   uv run uvicorn churn_mlops.serving.api.main:app --reload
+
+mlflow:
+  # Mismo nombre/alias que configs/registry.yaml — usados acá solo para leer
+  # metadata del champion (qué versión es, no sus bytes: ADR 0012).
+  registered_model_name: churn-lightgbm
+  champion_alias: champion
+
+# Bytes del Pipeline de producción, leídos de un archivo local versionado por
+# DVC (ADR 0012) — nunca descargados del Model Registry de MLflow.
+model_path: models/champion_pipeline.pkl
+
+api:
+  title: Churn Prediction API
+  host: 0.0.0.0
+  port: 8000
