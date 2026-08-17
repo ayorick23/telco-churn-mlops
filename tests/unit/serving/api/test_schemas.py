@@ -1,6 +1,7 @@
 import pytest
-from churn_mlops.serving.api.schemas import CustomerFeatures
 from pydantic import ValidationError
+
+from churn_mlops.serving.api.schemas import CustomerFeatures
 
 
 def test_accepts_raw_column_names_as_aliases(

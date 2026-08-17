@@ -1,6 +1,7 @@
 from typing import Any
 
 import pytest
+
 from churn_mlops.dashboard import api_client
 
 

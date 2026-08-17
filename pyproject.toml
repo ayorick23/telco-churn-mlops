@@ -125,6 +125,13 @@ ignore = ["E501", "N803", "N806"]
 # son normales (una celda de import puede importar cosas que se usan más adelante).
 "notebooks/*" = ["E402", "F401"]
 
+# --- FORMAT ---
+# notebooks/ es solo exploración (ver CLAUDE.md) — no forzamos el formatter
+# de Ruff sobre celdas ya revisadas de la Fase 1, mismo criterio que las
+# excepciones de lint de arriba.
+[tool.ruff.format]
+exclude = ["notebooks/*"]
+
 # --- MYPY (type checker) ---
 [tool.mypy]
 python_version = "3.11"

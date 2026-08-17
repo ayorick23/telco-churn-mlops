@@ -6,6 +6,7 @@ import mlflow
 import numpy as np
 import pandas as pd
 import pytest
+
 from churn_mlops.training.run_training import (
     configure_mlflow,
     evaluate_and_log_final_model,

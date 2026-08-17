@@ -1,0 +1,32 @@
+# Stack local de serving (Fase 8): API + dashboard, la misma pareja de
+# servicios que se despliega en Render/Hugging Face Spaces (ver
+# docs/decisions/0014-testing-cicd-despliegue-fase-8.md). Sin servicio
+# mlflow local a propósito — el MLflow real vive en DagsHub; un servidor
+# local duplicaría infraestructura sin un caso de uso claro en este
+# proyecto.
+#
+# Antes de levantar: `dvc pull models/champion_pipeline.pkl.dvc` (la API lo
+# necesita para construir su imagen, ver docker/api.Dockerfile).
+#
+#   docker compose up --build
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/dashboard.Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      CHURN_API_BASE_URL: http://api:8000
+    depends_on:
+      - api

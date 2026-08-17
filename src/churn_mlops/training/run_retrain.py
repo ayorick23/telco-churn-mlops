@@ -13,6 +13,7 @@ re-tune completo con Optuna (caso excepcional). Entrypoint:
     uv run python -m churn_mlops.training.run_retrain
 """
 
+import io
 import json
 import sys
 from pathlib import Path
@@ -25,8 +26,9 @@ import pandas as pd
 
 # La consola de Windows usa cp1252 por defecto, que no soporta los emojis que
 # mlflow imprime al terminar un run (ej. 🏃). Sin esto, el script crashea después
-# de loguear el run exitosamente.
-if sys.platform == "win32":
+# de loguear el run exitosamente. El isinstance narrowa sys.stdout a
+# TextIOWrapper para mypy (TextIOBase no declara reconfigure).
+if sys.platform == "win32" and isinstance(sys.stdout, io.TextIOWrapper):
     sys.stdout.reconfigure(encoding="utf-8")
 from sklearn.pipeline import Pipeline
 

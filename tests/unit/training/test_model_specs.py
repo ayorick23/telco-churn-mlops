@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+
 from churn_mlops.training.model_specs import (
     build_catboost_pipeline,
     build_lightgbm_pipeline,

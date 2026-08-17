@@ -8,8 +8,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
-from churn_mlops.serving.api import main as main_module
 from fastapi.testclient import TestClient
+
+from churn_mlops.serving.api import main as main_module
 
 
 class _FakePipeline:

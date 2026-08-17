@@ -1,6 +1,7 @@
 import numpy as np
 import optuna
 import pandas as pd
+
 from churn_mlops.training.tuning import (
     build_search_space,
     cross_validate_lightgbm,

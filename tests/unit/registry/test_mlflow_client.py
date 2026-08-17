@@ -6,6 +6,7 @@ import mlflow.sklearn
 import numpy as np
 import pandas as pd
 import pytest
+
 from churn_mlops.registry.mlflow_client import (
     get_champion_version,
     get_latest_version,

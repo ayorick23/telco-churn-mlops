@@ -12,14 +12,17 @@ run_model_selection.py, ADR 0009/0011). Entrypoint:
     uv run python -m churn_mlops.monitoring.run_retrain_check
 """
 
+import io
 import sys
 from pathlib import Path
 
 import pandas as pd
 
 # La consola de Windows usa cp1252 por defecto, que no soporta caracteres
-# acentuados en el print() de más abajo ("Próximos", etc.).
-if sys.platform == "win32":
+# acentuados en el print() de más abajo ("Próximos", etc.). El isinstance
+# narrowa sys.stdout a TextIOWrapper para mypy (TextIOBase no declara
+# reconfigure).
+if sys.platform == "win32" and isinstance(sys.stdout, io.TextIOWrapper):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from churn_mlops.config import load_yaml_config

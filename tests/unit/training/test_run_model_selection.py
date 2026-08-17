@@ -4,6 +4,7 @@ import mlflow
 import numpy as np
 import pandas as pd
 import pytest
+
 from churn_mlops.training.run_model_selection import (
     build_comparison_table,
     build_pipeline_for_family,

@@ -106,4 +106,4 @@ Do not remove these lines.
 | 5. Simulación de drift + monitoreo | ✅ Completado |
 | 6. Reentrenamiento y promoción | ✅ Completado |
 | 7. Serving + dashboard | ✅ Completado |
-| 8. Testing, CI/CD, despliegue | ⬜ Pendiente |
+| 8. Testing, CI/CD, despliegue | ✅ Completado |
