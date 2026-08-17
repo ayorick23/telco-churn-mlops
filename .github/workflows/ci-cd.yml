@@ -1,0 +1,121 @@
+# Fase 8 (ADR 0014). Dos jobs:
+#   - ci: corre siempre (push y PR) — lint, format, type-check, tests, y build
+#     (sin push) de ambas imágenes Docker, para detectar un Dockerfile roto
+#     ANTES de mergear, no recién al desplegar. Es el status check que
+#     protege main (branch protection, configurado a mano en GitHub — ver
+#     docs/decisions/0014-testing-cicd-despliegue-fase-8.md).
+#   - deploy: solo en push directo a main (nunca en PRs), y solo si ci pasó.
+#     Publica la imagen de la API en GHCR, dispara el redeploy en Render, y
+#     empuja el repo al remote de Hugging Face Spaces para el dashboard.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.29"
+          enable-cache: true
+
+      - run: uv sync --locked
+
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src/
+      - run: uv run pytest
+
+      # Credenciales de DagsHub reusadas para el remote de DVC (mismo par
+      # user/token que MLFLOW_TRACKING_USERNAME/PASSWORD, ver .env.example).
+      - name: Configurar credenciales de DVC
+        run: |
+          uv run dvc remote modify --local origin auth basic
+          uv run dvc remote modify --local origin user "${{ secrets.MLFLOW_TRACKING_USERNAME }}"
+          uv run dvc remote modify --local origin password "${{ secrets.MLFLOW_TRACKING_PASSWORD }}"
+
+      - name: Traer el champion versionado
+        run: uv run dvc pull models/champion_pipeline.pkl.dvc
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build de la imagen de la API (sin push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          push: false
+
+      - name: Build de la imagen del dashboard (sin push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/dashboard.Dockerfile
+          push: false
+
+  deploy:
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.29"
+          enable-cache: true
+
+      - run: uv sync --locked --no-dev
+
+      # Credenciales de DagsHub reusadas para el remote de DVC (mismo par
+      # user/token que MLFLOW_TRACKING_USERNAME/PASSWORD, ver .env.example).
+      - name: Configurar credenciales de DVC
+        run: |
+          uv run dvc remote modify --local origin auth basic
+          uv run dvc remote modify --local origin user "${{ secrets.MLFLOW_TRACKING_USERNAME }}"
+          uv run dvc remote modify --local origin password "${{ secrets.MLFLOW_TRACKING_PASSWORD }}"
+
+      - name: Traer el champion versionado
+        run: uv run dvc pull models/champion_pipeline.pkl.dvc
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push de la imagen de la API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/ayorick23/telco-churn-mlops-api:latest
+            ghcr.io/ayorick23/telco-churn-mlops-api:${{ github.sha }}
+
+      - name: Redesplegar la API en Render
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+      # El build del dashboard ya se validó en el job ci — acá solo se
+      # empuja el código, Hugging Face Spaces construye su propia imagen.
+      - name: Desplegar el dashboard en Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_REMOTE: ${{ secrets.HF_SPACE_REMOTE }}
+        run: |
+          git remote add space "https://ayorick23:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_REMOTE}"
+          git push --force space HEAD:main

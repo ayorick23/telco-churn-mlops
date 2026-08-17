@@ -112,7 +112,7 @@ churn-mlops/
 | 5. Simulación de drift + monitoreo           | ✅ Completado |
 | 6. Reentrenamiento y promoción               | ✅ Completado |
 | 7. Serving + dashboard                       | ✅ Completado |
-| 8. Testing, CI/CD, despliegue, documentación | ⬜ Pendiente  |
+| 8. Testing, CI/CD, despliegue, documentación | ✅ Completado |
 
 ## Cómo ejecutarlo
 
@@ -169,11 +169,34 @@ disparar desde la pestaña "Operaciones" del dashboard.
 ```bash
 uv run pytest              # suite completa
 uv run ruff check .        # lint
+uv run ruff format --check .  # formato
 uv run mypy src/           # type-check
 ```
 
-> Docker y despliegue (Render/Railway + Hugging Face Spaces) quedan para la
-> Fase 8 — `docker-compose.yml` está reservado pero todavía vacío.
+Los mismos checks corren en CI (`.github/workflows/ci-cd.yml`) en cada
+push y PR contra `main`.
+
+### Docker
+
+```bash
+dvc pull models/champion_pipeline.pkl.dvc   # la API necesita el .pkl real para su build
+docker compose up --build
+```
+
+Levanta la API en `http://localhost:8000` y el dashboard en
+`http://localhost:8501`, conectados por red interna de Docker Compose. Ver
+`docs/decisions/0014-testing-cicd-despliegue-fase-8.md` para el detalle de
+por qué el dashboard no necesita el modelo ni credenciales de DagsHub.
+
+### Despliegue
+
+La API (FastAPI, imagen en GHCR) se despliega en Render y el dashboard
+(Streamlit) en Hugging Face Spaces — infraestructura separada a propósito,
+ver ADR 0014. El job `deploy` de GitHub Actions corre automáticamente en
+cada push a `main` que pase el job `ci`, publica la imagen de la API y
+redespliega ambos servicios. Promover un nuevo champion **no** dispara un
+redeploy automático: el flujo es promover desde el dashboard → `dvc push`
+→ commitear el `.dvc` pointer actualizado → push a `main`.
 
 ## Roadmap
 
