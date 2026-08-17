@@ -1,6 +1,7 @@
 import pandas as pd
 import pandera.errors
 import pytest
+
 from churn_mlops.data.schema import raw_telco_schema
 
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+
 from churn_mlops.training.dataset import load_processed_datasets
 
 

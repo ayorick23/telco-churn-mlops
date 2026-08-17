@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+
 from churn_mlops.dashboard.data_sources import load_known_cities
 
 

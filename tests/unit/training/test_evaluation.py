@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from churn_mlops.training.evaluation import compute_classification_metrics
 
 

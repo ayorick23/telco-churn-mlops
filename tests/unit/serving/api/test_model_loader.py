@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+
 from churn_mlops.serving.api import model_loader
 
 

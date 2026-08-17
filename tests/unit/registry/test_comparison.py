@@ -1,4 +1,5 @@
 import pytest
+
 from churn_mlops.registry.comparison import (
     compare_aggregate,
     decide_promotion,

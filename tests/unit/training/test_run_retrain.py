@@ -5,6 +5,7 @@ import mlflow
 import numpy as np
 import pandas as pd
 import pytest
+
 from churn_mlops.training.run_retrain import (
     evaluate_and_log_refit_model,
     load_best_params,
