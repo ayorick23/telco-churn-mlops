@@ -19,3 +19,19 @@ report_configs:
 # existe, el dashboard simplemente no muestra logo — no rompe. Colocar el
 # archivo propio en esta ruta para activarlo.
 logo_path: assets/logo.png
+
+# Valor de negocio del churn (KPI "¿vale la pena retener?" en la página de
+# Predicción — ver src/churn_mlops/dashboard/business_value.py). Supuestos de
+# negocio, no derivados del dataset: ajustar a un caso real reemplazaría
+# estos placeholders.
+business_value:
+  # Costo estimado de una campaña de retención (llamada, descuento, oferta)
+  # por cliente. Placeholder — no viene del dataset.
+  retention_campaign_cost_usd: 50.0
+  # Meses del ciclo de contrato, usados para estimar cuánto valor queda
+  # comprometido. Month-to-Month no tiene plazo fijo: se trata como el aviso
+  # mínimo de baja (1 mes).
+  contract_term_months:
+    "Month-to-Month": 1
+    "One Year": 12
+    "Two Year": 24

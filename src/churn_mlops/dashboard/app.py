@@ -23,6 +23,7 @@ from pydantic import ValidationError
 
 from churn_mlops.config import load_yaml_config
 from churn_mlops.dashboard import api_client
+from churn_mlops.dashboard import business_value as bv
 from churn_mlops.dashboard import prediction_form as pf
 from churn_mlops.dashboard.data_sources import load_known_cities
 from churn_mlops.dashboard.form_fields import FieldSpec
@@ -46,6 +47,14 @@ _monitoring_dir = Path(
 )
 _registry_dir = Path(
     load_yaml_config(dashboard_config["report_configs"]["registry"])["reports_dir"]
+)
+
+_BUSINESS_VALUE_CONFIG = dashboard_config.get("business_value", {})
+RETENTION_CAMPAIGN_COST = float(
+    _BUSINESS_VALUE_CONFIG.get("retention_campaign_cost_usd", 0.0)
+)
+CONTRACT_TERM_MONTHS: dict[str, int] = _BUSINESS_VALUE_CONFIG.get(
+    "contract_term_months", {}
 )
 
 # Par divergente validado (skill de dataviz del proyecto): rojo = aumenta
@@ -169,6 +178,49 @@ def _render_prediction_result(
         "Predicción", "Churn" if explanation["churn_prediction"] else "No churn"
     )
     card_3.metric("Champion version", explanation["champion_version"])
+
+    contract = payload.get("contract")
+    tenure = payload.get("tenure_in_months")
+    monthly_charge = payload.get("monthly_charge")
+    if (
+        isinstance(contract, str)
+        and contract in CONTRACT_TERM_MONTHS
+        and isinstance(tenure, int | float)
+        and isinstance(monthly_charge, int | float)
+    ):
+        retention = bv.estimate_retention_value(
+            contract=contract,
+            tenure_in_months=int(tenure),
+            monthly_charge=float(monthly_charge),
+            churn_probability=proba,
+            contract_term_months=CONTRACT_TERM_MONTHS,
+            retention_campaign_cost=RETENTION_CAMPAIGN_COST,
+        )
+        st.subheader("💰 ¿Vale la pena retener a este cliente?")
+        bv_1, bv_2, bv_3 = st.columns(3)
+        bv_1.metric(
+            "Valor en riesgo",
+            f"${retention.value_at_risk:,.2f}",
+            help=f"Monthly Charge × {retention.remaining_months} mes(es) "
+            "restantes del contrato actual",
+        )
+        bv_2.metric(
+            "Pérdida esperada",
+            f"${retention.expected_loss:,.2f}",
+            help="Probabilidad de churn × valor en riesgo",
+        )
+        bv_3.metric("Costo de campaña de retención", f"${RETENTION_CAMPAIGN_COST:,.2f}")
+        if retention.worth_retaining:
+            st.success(
+                f"Conviene intentar retener: beneficio neto esperado de "
+                f"${retention.net_benefit:,.2f} (pérdida esperada − costo de "
+                "retención)."
+            )
+        else:
+            st.warning(
+                f"No conviene retener con este costo de campaña: beneficio "
+                f"neto esperado de ${retention.net_benefit:,.2f}."
+            )
 
     shap_df = pd.DataFrame(
         [
