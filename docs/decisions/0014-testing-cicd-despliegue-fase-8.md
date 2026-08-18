@@ -142,3 +142,58 @@ el día 1, esos errores se acumularon en vez de corregirse PR por PR.
   como paso manual pendiente, no como un bug de la implementación.
 - `tests/integration/` sigue sin tests reales (solo `__init__.py`) — no
   se agregó cobertura de integración en esta fase, fuera de alcance.
+
+## Actualización — consolidación en Hugging Face Spaces (2026-08-18)
+
+Al ejecutar el rollout real (los servicios de Render/HF nunca se habían
+levantado, solo el código estaba listo), Render cambió su política de free
+tier y ahora exige verificación con tarjeta de crédito antes de crear un
+Web Service — no cobra, pero bloquea el flujo sin tarjeta. Decisión
+explícita del usuario: en vez de agregar una tarjeta, **se abandona Render
+y se consolidan API + dashboard como dos Spaces Docker independientes en
+Hugging Face Spaces**, revirtiendo el punto 1 de la sección "Decisión"
+original.
+
+- **Se mantiene la razón de fondo de por qué la API nunca construye su
+  propia imagen en la plataforma de hosting** (evitar darle credenciales
+  de DagsHub a un build remoto) — eso no cambió, solo el destino final de
+  la imagen ya construida. La imagen de la API se sigue publicando una
+  sola vez en GHCR desde GitHub Actions (sin cambios en ese paso).
+- **El Space de la API es un Dockerfile mínimo de una sola línea**
+  (`FROM ghcr.io/ayorick23/telco-churn-mlops-api:latest`) — verificado que
+  el paquete de GHCR es público (`ghcr.io/ayorick23/telco-churn-mlops-api`),
+  así que el Space lo puede pullear sin secret ni login adicional.
+- **Hueco descubierto al implementar esto**: el plan original de esta ADR
+  decía que HF Spaces "reusa `docker/dashboard.Dockerfile` directo", pero
+  el SDK Docker de HF Spaces exige un archivo llamado exactamente
+  `Dockerfile` en la **raíz** del repo del Space — no soporta apuntar a
+  una ruta custom vía metadata de `README.md`. Nunca se detectó porque el
+  Space nunca se había creado. Se corrige generando, dentro del propio
+  job `deploy` (no commiteado a `main`), un árbol mínimo por Space:
+  - Space de la API: solo `Dockerfile` (la línea de arriba) + `README.md`
+    con el front-matter YAML que Spaces requiere (`sdk: docker`,
+    `app_port: 8000`).
+  - Space del dashboard: `pyproject.toml`, `uv.lock`, `src/`, `configs/`,
+    `reports/` (el contexto real que ya usaba
+    `docker/dashboard.Dockerfile`) más una copia de ese Dockerfile como
+    `Dockerfile` en la raíz y un `README.md` con `app_port: 8501`. No se
+    empuja el monorepo completo (notebooks, docs, tests, data) — sin
+    motivo para que viaje a un Space cuyo único trabajo es construir esa
+    imagen.
+  - `docker/api.Dockerfile` y `docker/dashboard.Dockerfile` no cambian —
+    siguen siendo la fuente real para `docker-compose.yml` y el build de
+    validación del job `ci`; el job `deploy` solo los reutiliza (copia o
+    referencia) al armar el árbol de cada Space.
+- **Secrets**: `RENDER_DEPLOY_HOOK_URL` se da de baja (ya no se usa).
+  `HF_SPACE_REMOTE` se reemplaza por dos secrets separados,
+  `HF_API_SPACE` (`ayorick23/telco-churn-mlops-api`) y
+  `HF_DASHBOARD_SPACE` (`ayorick23/telco-churn-mlops-dashboard`). `HF_TOKEN`
+  se reusa para ambos pushes.
+- **Riesgo real que se acepta**: el free tier de HF Spaces duerme los
+  Spaces inactivos. Antes solo el dashboard tenía ese riesgo (la API
+  vivía en Render); ahora ambos pueden estar dormidos a la vez, así que
+  un dashboard recién despertado puede pegarle a una API que también está
+  arrancando — la primera predicción después de inactividad puede tardar
+  o dar timeout. No se mitiga en esta fase (agregar un healthcheck/retry
+  en el dashboard queda como mejora futura, no bloqueante para un
+  proyecto de portafolio).

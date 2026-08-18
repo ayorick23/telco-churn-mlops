@@ -65,7 +65,7 @@ Cada capa solo conoce a la anterior — por ejemplo, el sistema de monitoreo dep
 | Validación de datos            | Pandera (datos crudos/lotes), Pydantic (requests de API) |
 | Monitoreo de drift             | Evidently AI                                             |
 | Explicabilidad                 | SHAP                                                     |
-| API                            | FastAPI                                                  |
+| API                            | FastAPI (desplegada en Hugging Face Spaces)              |
 | Dashboard                      | Streamlit (desplegado en Hugging Face Spaces)            |
 | Testing                        | Pytest                                                   |
 | Calidad de código              | Ruff, MyPy, pre-commit                                   |
@@ -190,13 +190,17 @@ por qué el dashboard no necesita el modelo ni credenciales de DagsHub.
 
 ### Despliegue
 
-La API (FastAPI, imagen en GHCR) se despliega en Render y el dashboard
-(Streamlit) en Hugging Face Spaces — infraestructura separada a propósito,
-ver ADR 0014. El job `deploy` de GitHub Actions corre automáticamente en
-cada push a `main` que pase el job `ci`, publica la imagen de la API y
-redespliega ambos servicios. Promover un nuevo champion **no** dispara un
-redeploy automático: el flujo es promover desde el dashboard → `dvc push`
-→ commitear el `.dvc` pointer actualizado → push a `main`.
+La API (FastAPI) y el dashboard (Streamlit) se despliegan como dos Spaces
+Docker independientes en Hugging Face Spaces — ver ADR 0014 (actualización
+2026-08-18). La API se publica primero como imagen en GHCR y su Space solo
+la referencia (`FROM ghcr.io/ayorick23/telco-churn-mlops-api:latest`); el
+Space del dashboard construye su propia imagen desde
+`docker/dashboard.Dockerfile`. El job `deploy` de GitHub Actions corre
+automáticamente en cada push a `main` que pase el job `ci`, publica la
+imagen de la API y redespliega ambos Spaces. Promover un nuevo champion
+**no** dispara un redeploy automático: el flujo es promover desde el
+dashboard → `dvc push` → commitear el `.dvc` pointer actualizado → push a
+`main`.
 
 ## Roadmap
 

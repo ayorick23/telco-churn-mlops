@@ -78,8 +78,8 @@ src/churn_mlops/
 |---|---|---|
 | DVC remote | `https://dagshub.com/ayorick23/telco-churn-mlops.dvc` | Data versioning |
 | MLflow | `https://dagshub.com/ayorick23/telco-churn-mlops.mlflow` | Experiment tracking + Model Registry |
-| FastAPI | Render / Railway (free tier) | REST prediction API |
-| Streamlit | Hugging Face Spaces | Dashboard |
+| FastAPI | Hugging Face Spaces (Docker, imagen desde GHCR) | REST prediction API |
+| Streamlit | Hugging Face Spaces (Docker, build propio) | Dashboard |
 | GitHub Actions | — | CI (lint, type-check, tests) + CD |
 
 Credentials go in `.env` (gitignored). Use `.env.example` as the template. DVC credentials also go in `.dvc/config.local` (gitignored).

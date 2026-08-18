@@ -1,12 +1,16 @@
-# Fase 8 (ADR 0014). Dos jobs:
+# Fase 8 (ADR 0014, actualizado 2026-08-18 — consolidación en Hugging Face
+# Spaces). Dos jobs:
 #   - ci: corre siempre (push y PR) — lint, format, type-check, tests, y build
 #     (sin push) de ambas imágenes Docker, para detectar un Dockerfile roto
 #     ANTES de mergear, no recién al desplegar. Es el status check que
 #     protege main (branch protection, configurado a mano en GitHub — ver
 #     docs/decisions/0014-testing-cicd-despliegue-fase-8.md).
 #   - deploy: solo en push directo a main (nunca en PRs), y solo si ci pasó.
-#     Publica la imagen de la API en GHCR, dispara el redeploy en Render, y
-#     empuja el repo al remote de Hugging Face Spaces para el dashboard.
+#     Publica la imagen de la API en GHCR y redespliega dos Spaces Docker de
+#     Hugging Face (API y dashboard) — cada uno arma su propio árbol mínimo
+#     de archivos en un directorio temporal y lo empuja force, nunca toca
+#     `main` (ver la actualización del ADR 0014 para el porqué del árbol
+#     mínimo en vez de pushear el repo completo).
 
 name: CI/CD
 
@@ -107,15 +111,74 @@ jobs:
             ghcr.io/ayorick23/telco-churn-mlops-api:latest
             ghcr.io/ayorick23/telco-churn-mlops-api:${{ github.sha }}
 
-      - name: Redesplegar la API en Render
-        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+      # El Space de la API no construye nada: solo referencia la imagen ya
+      # publicada en GHCR (pública, sin login necesario para el pull). Árbol
+      # de 2 archivos armado en un dir temporal, nunca commiteado a main.
+      - name: Desplegar la API en Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_API_SPACE: ${{ secrets.HF_API_SPACE }}
+        run: |
+          set -e
+          stage=$(mktemp -d)
 
-      # El build del dashboard ya se validó en el job ci — acá solo se
-      # empuja el código, Hugging Face Spaces construye su propia imagen.
+          echo 'FROM ghcr.io/ayorick23/telco-churn-mlops-api:latest' > "$stage/Dockerfile"
+
+          {
+            echo "---"
+            echo "title: Telco Churn API"
+            echo "emoji: 📡"
+            echo "colorFrom: red"
+            echo "colorTo: gray"
+            echo "sdk: docker"
+            echo "app_port: 8000"
+            echo "---"
+            echo
+            echo "API REST de predicción de churn (FastAPI + LightGBM + SHAP)."
+            echo "Imagen publicada por GitHub Actions en"
+            echo '`ghcr.io/ayorick23/telco-churn-mlops-api` — este Space solo la'
+            echo "despliega, no la construye desde código"
+            echo "(ver docs/decisions/0014-testing-cicd-despliegue-fase-8.md)."
+          } > "$stage/README.md"
+
+          cd "$stage"
+          git init -q
+          git checkout -q -b main
+          git -c user.name="GitHub Actions" -c user.email="actions@github.com" add -A
+          git -c user.name="GitHub Actions" -c user.email="actions@github.com" commit -q -m "Deploy ${{ github.sha }}"
+          git push --force "https://ayorick23:${HF_TOKEN}@huggingface.co/spaces/${HF_API_SPACE}" HEAD:main
+
+      # El Space del dashboard sí construye su propia imagen — se le manda
+      # solo el contexto real que docker/dashboard.Dockerfile necesita (ese
+      # mismo Dockerfile, copiado a la raíz porque el SDK Docker de HF
+      # Spaces exige el archivo ahí, no soporta una ruta custom).
       - name: Desplegar el dashboard en Hugging Face Spaces
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_SPACE_REMOTE: ${{ secrets.HF_SPACE_REMOTE }}
+          HF_DASHBOARD_SPACE: ${{ secrets.HF_DASHBOARD_SPACE }}
         run: |
-          git remote add space "https://ayorick23:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_REMOTE}"
-          git push --force space HEAD:main
+          set -e
+          stage=$(mktemp -d)
+
+          cp -r pyproject.toml uv.lock src configs reports "$stage/"
+          cp docker/dashboard.Dockerfile "$stage/Dockerfile"
+
+          {
+            echo "---"
+            echo "title: Telco Churn Dashboard"
+            echo "emoji: 📊"
+            echo "colorFrom: blue"
+            echo "colorTo: red"
+            echo "sdk: docker"
+            echo "app_port: 8501"
+            echo "---"
+            echo
+            cat README.md
+          } > "$stage/README.md"
+
+          cd "$stage"
+          git init -q
+          git checkout -q -b main
+          git -c user.name="GitHub Actions" -c user.email="actions@github.com" add -A
+          git -c user.name="GitHub Actions" -c user.email="actions@github.com" commit -q -m "Deploy ${{ github.sha }}"
+          git push --force "https://ayorick23:${HF_TOKEN}@huggingface.co/spaces/${HF_DASHBOARD_SPACE}" HEAD:main
