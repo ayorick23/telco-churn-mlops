@@ -197,3 +197,62 @@ original.
   o dar timeout. No se mitiga en esta fase (agregar un healthcheck/retry
   en el dashboard queda como mejora futura, no bloqueante para un
   proyecto de portafolio).
+
+## Actualización — tests de integración (2026-08-18)
+
+Se cierra el hueco documentado arriba en "Consecuencias" (`tests/integration/`
+sin tests reales). Motivador directo: los dos bugs reales encontrados al
+validar el rollout desde la PC de casa (commits `c006a49` y `a63c4bd`, ver la
+actualización anterior) son exactamente la clase de bug que ni los tests
+unitarios (todos mockean `get_pipeline`/`explain_prediction`, o fabrican el
+archivo de ciudades con `tmp_path`) ni el paso "build sin push" del job `ci`
+(solo construye, nunca corre el contenedor) podían atrapar.
+
+Tres archivos nuevos en `tests/integration/`, cada uno cerrando un hueco
+específico (detalle del razonamiento en el docstring de cada archivo):
+
+- **`test_prediction_pipeline.py`**: el Pipeline champion real (sin mocks),
+  vía `TestClient` — `/predict` y `/explain` contra el `.pkl` de verdad, no
+  contra el `_FakePipeline` que usa `tests/unit/serving/api/test_main.py`.
+- **`test_dashboard_data_sources.py`**: `load_known_cities()` contra el
+  `reports/known_cities.json` **real** commiteado, no un archivo fabricado
+  por el test (el unit test sí lo fabrica con `tmp_path`) — este test
+  hubiera atrapado el bug de `a63c4bd` directo, sin necesitar Docker.
+- **`test_docker_stack.py`**: `docker compose up --build` real de los dos
+  servicios + smoke tests contra los contenedores vivos (`/health`,
+  `/predict`, reachability del dashboard). Hubiera atrapado el bug de
+  `libgomp1` (`c006a49`) porque, a diferencia del paso "build sin push" que
+  existía antes, este sí **corre** el contenedor, no solo lo construye.
+
+Decisiones de diseño:
+
+- Los tres usan `skipif` en vez de fallar duro cuando falta un prerequisito
+  (el `.pkl` local, o el daemon de Docker corriendo) — así `uv run pytest`
+  sigue siendo seguro en cualquier máquina de desarrollo, sin bloquear a
+  alguien que no corrió `dvc pull` o no tiene Docker Desktop abierto.
+- El job `ci` se reordenó: `dvc pull` y `docker/setup-buildx-action` ahora
+  corren **antes** de `uv run pytest` (antes iban después), porque los
+  tests de integración necesitan el `.pkl` y Docker disponibles en ese
+  punto. Los dos steps "build de la imagen... (sin push)" que existían se
+  eliminaron — quedaron redundantes: el `docker compose up --build` de
+  `test_docker_stack.py` ya construye ambas imágenes, y además las corre —
+  estrictamente más cobertura que solo construirlas.
+- `test_docker_stack.py` escribe un `.env` mínimo si no existe (necesario
+  porque `docker-compose.yml` declara `env_file: .env` para el servicio
+  `api`, y un checkout limpio de CI no lo tiene — está en `.gitignore`) y lo
+  borra al terminar; si ya existe (dev local con credenciales reales) lo
+  deja intacto. Seguro de escribir solo por la comprobación de "no existía
+  antes" — nunca pisa un `.env` real de un desarrollador.
+
+Consecuencias:
+
+- El job `ci` ahora tarda más (construye ambas imágenes Docker completas
+  dentro de `docker compose up --build`, en vez de solo dos builds
+  livianos) — aceptado: es el costo directo de que CI valide algo que antes
+  solo se verificaba a mano.
+- `test_docker_stack.py` no atrapa toda clase de bug de la Fase 8 —
+  puntualmente, no hubiera atrapado el bug de `a63c4bd` por sí solo (el
+  `FileNotFoundError` solo ocurre al navegar a la página de Streamlit desde
+  un browser real, no al pegarle a `/_stcore/health`) — por eso
+  `test_dashboard_data_sources.py` existe aparte, sin depender de Docker, y
+  sí lo cubre directo.

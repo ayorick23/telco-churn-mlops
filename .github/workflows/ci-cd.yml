@@ -1,9 +1,14 @@
 # Fase 8 (ADR 0014, actualizado 2026-08-18 — consolidación en Hugging Face
-# Spaces). Dos jobs:
-#   - ci: corre siempre (push y PR) — lint, format, type-check, tests, y build
-#     (sin push) de ambas imágenes Docker, para detectar un Dockerfile roto
-#     ANTES de mergear, no recién al desplegar. Es el status check que
-#     protege main (branch protection, configurado a mano en GitHub — ver
+# Spaces; test de integración agregado el mismo día, ver
+# tests/integration/). Dos jobs:
+#   - ci: corre siempre (push y PR) — lint, format, type-check, y
+#     `uv run pytest`, que ahora incluye tests/integration/: pipeline
+#     champion real sin mocks, el reports/known_cities.json real, y un
+#     `docker compose up --build` real de los dos servicios con smoke tests
+#     contra los contenedores vivos (no solo que construyan, como antes) —
+#     ver el docstring de cada archivo en tests/integration/ para el bug real
+#     que cada uno habría atrapado. Es el status check que protege main
+#     (branch protection, configurado a mano en GitHub — ver
 #     docs/decisions/0014-testing-cicd-despliegue-fase-8.md).
 #   - deploy: solo en push directo a main (nunca en PRs), y solo si ci pasó.
 #     Publica la imagen de la API en GHCR y redespliega dos Spaces Docker de
@@ -36,10 +41,12 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy src/
-      - run: uv run pytest
 
       # Credenciales de DagsHub reusadas para el remote de DVC (mismo par
       # user/token que MLFLOW_TRACKING_USERNAME/PASSWORD, ver .env.example).
+      # Movido ANTES de pytest: tests/integration/test_prediction_pipeline.py
+      # y test_docker_stack.py necesitan el .pkl real en disco para no
+      # saltarse (ver sus skipif).
       - name: Configurar credenciales de DVC
         run: |
           uv run dvc remote modify --local origin auth basic
@@ -51,19 +58,12 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build de la imagen de la API (sin push)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/api.Dockerfile
-          push: false
-
-      - name: Build de la imagen del dashboard (sin push)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/dashboard.Dockerfile
-          push: false
+      # Ya no hay steps separados de "build sin push": el `docker compose up
+      # --build` real de tests/integration/test_docker_stack.py (dentro de
+      # `uv run pytest`) construye ambas imágenes de todos modos, y además
+      # las corre y las golpea — estrictamente más cobertura que solo
+      # construirlas.
+      - run: uv run pytest
 
   deploy:
     needs: ci
