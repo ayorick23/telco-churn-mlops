@@ -10,14 +10,14 @@ retención.
 
 ## De un vistazo
 
-| Métrica | Valor |
-|---|---|
-| ROC-AUC (champion) | 0.99 |
-| F1-Score (champion) | 0.93 |
-| Recall — churn | 91% |
-| Precisión | 95% |
+| Métrica             | Valor |
+| ------------------- | ----- |
+| ROC-AUC (champion)  | 0.99  |
+| F1-Score (champion) | 0.93  |
+| Recall — churn      | 91%   |
+| Precisión           | 95%   |
 | Clientes analizados | 7,043 |
-| Tests automatizados | 149 |
+| Tests automatizados | 149   |
 
 ---
 
@@ -74,11 +74,6 @@ verificado con tests automatizados — el objetivo es que un problema de
 calidad de datos falle ruidoso en el pipeline, no silenciosamente en una
 predicción de producción.
 
-> 📸 **Captura pendiente:** una corrida de `pytest` mostrando un test de
-> `tests/data_validation/` fallando a propósito contra una fila inválida (o
-> el traceback real de un `SchemaError` de Pandera) — prueba visual de que
-> el contrato de datos se hace cumplir, no solo se documenta.
-
 ## Ingeniería de variables
 
 De las 50 columnas originales quedan 37 features crudas después de excluir
@@ -110,7 +105,7 @@ subió el F1 del champion final a **0.931** con **ROC-AUC de 0.992**.
 
 Cada experimento (parámetros, métricas, artefactos) queda registrado en
 **MLflow**, con el Model Registry gestionando qué versión sirve en
-producción vía **aliases** (`champion`), no el sistema de *stages* ya
+producción vía **aliases** (`champion`), no el sistema de _stages_ ya
 deprecado. El código se versiona con Git y los datos/modelos con **DVC**
 contra un remoto en DagsHub — la combinación permite reproducir cualquier
 resultado pasado sabiendo exactamente qué código, qué datos y qué
@@ -167,12 +162,7 @@ compara ese número contra el costo de una campaña de retención para decidir,
 con un criterio explícito, si vale la pena intervenir — la parte del
 proyecto que conecta la predicción técnica con la decisión de negocio real.
 
-> 📸 **Capturas pendientes (las más importantes del documento):**
->
-> 1. El dashboard de Streamlit mostrando una predicción real con el gráfico
->    SHAP (barras rojo/azul, aumenta vs. reduce riesgo).
-> 2. La tarjeta nueva "¿Vale la pena retener a este cliente?" con los KPIs
->    de valor en riesgo, pérdida esperada y beneficio neto.
+![App de Streamlit con una predicción real de un cliente y gráfico SHAP](assets/case-study/screenshot-streamlit-app.png)
 
 ## Testing y CI/CD
 
@@ -206,10 +196,7 @@ cambiaron de política de precios entre que se diseñó el despliegue y que se
 intentó ejecutar — una decisión de infraestructura real y su trade-off, no
 una limitación técnica del proyecto ([ADR 0014](decisions/0014-testing-cicd-despliegue-fase-8.md)).
 
-> 📸 **Captura pendiente:** Docker Desktop (o `docker compose ps`) con los
-> dos contenedores (`api`, `dashboard`) corriendo sanos — prueba que el
-> stack funciona end-to-end localmente aunque el hosting final siga
-> pendiente.
+![Docker Desktop con los dos contenedores (`api`, `dashboard`) corriendo sanos](assets/case-study/screenshot-docker-containers.png)
 
 ## Retos técnicos y cómo se resolvieron
 
