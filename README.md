@@ -1,6 +1,9 @@
-# Churn MLOps — Sistema de Predicción de Churn con Ciclo Completo de MLOps
+# Telco Churn MLOps: Sistema de Predicción de Churn con Ciclo Completo de MLOps
 
-> 🚧 **Proyecto en desarrollo activo.** Este README se actualizará a medida que avancen las fases del roadmap.
+[![CI](https://github.com/ayorick23/telco-churn-mlops/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/ayorick23/telco-churn-mlops/actions/workflows/ci-cd.yml)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org)
+[![uv](https://img.shields.io/badge/managed%20with-uv-de5fe9)](https://docs.astral.sh/uv/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Sistema end-to-end de predicción de churn de clientes que va más allá de entrenar un modelo: implementa el ciclo completo de MLOps — tracking de experimentos, registro y promoción de modelos, detección de drift, y reentrenamiento asistido — sobre un dataset de churn de telecomunicaciones (Telco Customer Churn).
 
@@ -8,7 +11,7 @@ El objetivo del proyecto no es solo predecir qué clientes van a cancelar su ser
 
 ## Tabla de contenidos
 
-- [Churn MLOps — Sistema de Predicción de Churn con Ciclo Completo de MLOps](#churn-mlops--sistema-de-predicción-de-churn-con-ciclo-completo-de-mlops)
+- [Telco Churn MLOps: Sistema de Predicción de Churn con Ciclo Completo de MLOps](#telco-churn-mlops-sistema-de-predicción-de-churn-con-ciclo-completo-de-mlops)
   - [Tabla de contenidos](#tabla-de-contenidos)
   - [Problema de negocio](#problema-de-negocio)
   - [Qué hace el sistema](#qué-hace-el-sistema)
@@ -18,7 +21,15 @@ El objetivo del proyecto no es solo predecir qué clientes van a cancelar su ser
   - [Estructura del repositorio](#estructura-del-repositorio)
   - [Estado del proyecto](#estado-del-proyecto)
   - [Cómo ejecutarlo](#cómo-ejecutarlo)
+    - [Pipeline de datos y entrenamiento](#pipeline-de-datos-y-entrenamiento)
+    - [Servir el modelo](#servir-el-modelo)
+    - [Monitoreo y reentrenamiento (manual — ver ADR 0012)](#monitoreo-y-reentrenamiento-manual--ver-adr-0012)
+    - [Tests y calidad de código](#tests-y-calidad-de-código)
+    - [Docker](#docker)
+    - [Despliegue](#despliegue)
   - [Roadmap](#roadmap)
+  - [Fuentes de datos y créditos](#fuentes-de-datos-y-créditos)
+  - [Caso de estudio](#caso-de-estudio)
   - [Licencia](#licencia)
 
 ## Problema de negocio
@@ -157,8 +168,8 @@ uv run streamlit run src/churn_mlops/dashboard/app.py
 ```bash
 uv run python -m churn_mlops.monitoring.run_monitoring       # simula drift y lo detecta con Evidently
 uv run python -m churn_mlops.monitoring.run_retrain_check    # ¿el drift amerita reentrenar?
-uv run python -m churn_mlops.training.run_retrain             # reentrena el challenger
-uv run python -m churn_mlops.registry.run_promotion            # compara y promueve a champion si corresponde
+uv run python -m churn_mlops.training.run_retrain            # reentrena el challenger
+uv run python -m churn_mlops.registry.run_promotion          # compara y promueve a champion si corresponde
 ```
 
 Los mismos pasos de monitoreo/reentrenamiento/promoción también se pueden
@@ -167,10 +178,10 @@ disparar desde la pestaña "Operaciones" del dashboard.
 ### Tests y calidad de código
 
 ```bash
-uv run pytest              # suite completa
-uv run ruff check .        # lint
+uv run pytest                 # suite completa
+uv run ruff check .           # lint
 uv run ruff format --check .  # formato
-uv run mypy src/           # type-check
+uv run mypy src/              # type-check
 ```
 
 Los mismos checks corren en CI (`.github/workflows/ci-cd.yml`) en cada
@@ -205,6 +216,18 @@ dashboard → `dvc push` → commitear el `.dvc` pointer actualizado → push a
 ## Roadmap
 
 El roadmap del proyecto son las 8 fases de la tabla de "Estado del proyecto". Las decisiones de diseño y tooling tomadas en cada fase quedan registradas como ADRs en [`docs/decisions/`](docs/decisions/). El EDA completo de la Fase 1 está en [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
+
+## Fuentes de datos y créditos
+
+Este proyecto ha sido posible gracias a la disponibilidad de datos abiertos.
+
+- **Dataset:** [Telco Customer Churn 11.1.3](https://www.kaggle.com/datasets/alfathterry/telco-customer-churn-11-1-3), publicado en Kaggle por la usuaria Alfath Terry — snapshot de la versión 11.1.3 del dataset de IBM (7 043 clientes, 50 columnas) usado como fuente cruda del pipeline (`data/raw/telco.csv`, versionado con DVC).
+
+Agradecemos a esta plataforma por facilitar el acceso a esta información para fines educativos y de portafolio.
+
+## Caso de estudio
+
+Para un resumen orientado a negocio del proyecto — problema, resultados, decisiones clave y capturas del sistema en funcionamiento — ver [`docs/CASE_STUDY.md`](docs/CASE_STUDY.md).
 
 ## Licencia
 
